@@ -1,0 +1,10 @@
+{
+  "name":"PARANOISE GuildBattle",
+  "short_name":"GuildBattle",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#0b1020",
+  "theme_color":"#111827",
+  "lang":"ja",
+  "description":"パラノイズのギルド戦データを管理するPWA Phase 1"
+}
