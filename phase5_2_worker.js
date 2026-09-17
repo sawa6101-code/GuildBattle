@@ -1,4 +1,5 @@
 /* Phase 5.2 Worker - 実際のPhase 4.4エンジンをWorker内で実行 */
+self.window=self;
 importScripts('phase4_4.js');
 self.onmessage=e=>{
  const d=e.data;
