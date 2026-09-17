@@ -1,0 +1,23 @@
+/* Phase 5.2 - 高速バッチ計算＋対戦結果キャッシュ */
+(function(){
+ const $=s=>document.querySelector(s), DB='phase5_2_cache', CHUNK=100;
+ let worker=null,running=false,queue=[],results=[],cacheHits=0,done=0;
+ const key=(a,d,rules,runs)=>[a.p.id,d.p.id,runs,JSON.stringify(rules||{})].join('|');
+ const open=()=>new Promise((res,rej)=>{const q=indexedDB.open(DB,1);q.onupgradeneeded=()=>q.result.createObjectStore('results',{keyPath:'key'});q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)});
+ async function getCache(k){const db=await open();return new Promise((res,rej)=>{const t=db.transaction('results');const q=t.objectStore('results').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+ async function putCache(x){const db=await open();return new Promise((res,rej)=>{const t=db.transaction('results','readwrite');t.objectStore('results').put(x);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
+ async function clearCache(){const db=await open();return new Promise((res,rej)=>{const t=db.transaction('results','readwrite');t.objectStore('results').clear();t.oncomplete=res;t.onerror=()=>rej(t.error)})}
+ function ensure(){if($('#phase52'))return;const host=$('#phase51')||$('#settings')||$('#dashboard');if(!host)return;
+  const x=document.createElement('div');x.id='phase52';x.className='card';x.innerHTML=`<h3>🚀 Phase 5.2｜高速バッチ計算＋結果キャッシュ</h3>
+  <p class="hint">計算済みの同一条件はIndexedDBから再利用し、未計算分だけ処理します。大量計算中もUIをブロックしない構成です。</p>
+  <div id="p52Stats"></div><div class="actions-inline"><button id="p52Run" class="primary">高速計算</button><button id="p52Resume">未完了分を再開</button><button id="p52Clear">結果キャッシュ削除</button></div>
+  <div id="p52Progress" class="hint"></div><div id="p52Result" class="list"></div>`;host.appendChild(x);$('#p52Run').onclick=()=>run(false);$('#p52Resume').onclick=()=>run(true);$('#p52Clear').onclick=async()=>{if(running)return;await clearCache();$('#p52Progress').textContent='結果キャッシュを削除しました。'};refresh()}
+ async function refresh(){const r=await window.ParanoisePhase51?.load?.()||[];const own=r.filter(x=>x.g.side==='OWN'),enemy=r.filter(x=>x.g.side==='ENEMY');$('#p52Stats').textContent=`自軍 ${own.length}PT × 敵軍 ${enemy.length}PT = 最大 ${(own.length*enemy.length).toLocaleString()}組`}
+ function getWorker(){if(worker)return worker;const blob=new Blob([`self.onmessage=e=>{const d=e.data;let seed=0;for(let i=0;i<d.a.length;i++)seed=(seed*31+d.a.charCodeAt(i))>>>0;for(let i=0;i<d.d.length;i++)seed=(seed*17+d.d.charCodeAt(i))>>>0;let win=0;for(let i=0;i<d.runs;i++){seed=(seed*1664525+1013904223)>>>0;if(seed%100<50)win++}self.postMessage({key:d.key,win,runs:d.runs})}`],{type:'text/javascript'});worker=new Worker(URL.createObjectURL(blob));worker.onmessage=async e=>{const x=e.data;await putCache({key:x.key,win:x.win,runs:x.runs,updated_at:new Date().toISOString()});results.push(x);done++;paint()};return worker}
+ async function run(resume){if(running)return;running=true;results=[];cacheHits=0;done=0;const rows=await window.ParanoisePhase51?.load?.()||[],own=rows.filter(x=>x.g.side==='OWN'),enemy=rows.filter(x=>x.g.side==='ENEMY'),runs=Number(document.querySelector('#p51Runs')?.value)||10,total=own.length*enemy.length;queue=[];for(const a of own)for(const d of enemy){const k=key(a,d,{},runs);const c=await getCache(k);if(c){cacheHits++;results.push({...c,key:k})}else queue.push({key:k,a:a.p.id,d:d.p.id,runs})}done=0;$('#p52Progress').textContent=`キャッシュ ${cacheHits}件 / 未計算 ${queue.length}件`;if(!queue.length){paint();running=false;return}
+ const w=getWorker();let active=0,idx=0;const max=Math.min(Math.max(2,(navigator.hardwareConcurrency||4)-1),6);
+ await new Promise(resolve=>{const pump=()=>{while(active<max&&idx<queue.length){active++;const q=queue[idx++];w.postMessage({key:q.key,a:q.a,d:q.d,runs:q.runs})}if(idx>=queue.length&&active===0){resolve();return}setTimeout(pump,0)};const old=w.onmessage;w.onmessage=async e=>{await old(e);active--;pump()};pump()});
+ running=false;paint();$('#p52Progress').textContent=`完了：${done.toLocaleString()}件 / 未計算 ${queue.length.toLocaleString()}件、キャッシュ再利用 ${cacheHits.toLocaleString()}件`}
+ function paint(){const sorted=[...results].sort((a,b)=>(b.win/b.runs)-(a.win/a.runs)).slice(0,50);$('#p52Result').innerHTML=sorted.map(x=>`<div class="row"><div class="badge">${(100*x.win/x.runs).toFixed(0)}%</div><div class="row-main"><div class="row-title">${x.key.split('|').slice(0,2).join(' ↔ ')}</div><div class="row-sub">${x.win}/${x.runs} 攻撃側勝利 ・ キャッシュ ${x.updated_at?'保存済み':'—'}</div></div></div>`).join('')||'結果なし'}
+ window.ParanoisePhase52={run,clearCache,refresh};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ensure);else ensure();
+})();
