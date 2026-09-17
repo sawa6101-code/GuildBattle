@@ -1,10 +1,7 @@
-/* GuildBattle performance + Phase 5.1 loader */
+/* GuildBattle performance + Phase 5 loader */
 (function(){
  const loaded=new Set(),loading=new Map();let replaying=false;
- const loadScript=src=>{if(loaded.has(src))return Promise.resolve();if(loading.has(src))return loading.get(src);
-  const p=new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.async=false;
-   s.onload=()=>{loaded.add(src);loading.delete(src);resolve()};s.onerror=()=>{loading.delete(src);reject(new Error('読み込み失敗: '+src))};document.body.appendChild(s)});
-  loading.set(src,p);return p};
+ const loadScript=src=>{if(loaded.has(src))return Promise.resolve();if(loading.has(src))return loading.get(src);const p=new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.async=false;s.onload=()=>{loaded.add(src);loading.delete(src);resolve()};s.onerror=()=>{loading.delete(src);reject(new Error('読み込み失敗: '+src))};document.body.appendChild(s)});loading.set(src,p);return p};
  const series=xs=>xs.reduce((p,x)=>p.then(()=>loadScript(x)),Promise.resolve());
  const battle=['phase4.js','phase4_1.js','phase4_2_character_master.js','phase4_3.js','phase4_4.js','phase4_5.js','phase4_6.js','phase4_7.js','phase4_8.js','phase4_9.js','phase4_10.js'];
  let battleReady=null;
@@ -14,12 +11,9 @@
  async function ensureOCR(){if(window.Tesseract)return;return loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js')}
  async function ensurePhase5(){return loadScript('phase5.js')}
  async function ensurePhase51(){await ensurePhase5();return loadScript('phase5_1.js')}
- async function prepare(v){if(v==='battle')return ensureBattle();if(v==='characters')return ensureCharacters();if(v==='import'){await loadScript('phase3.js');return ensureOCR()}if(v==='settings')return ensurePhase51()}
- document.addEventListener('click',async e=>{
-  if(replaying)return;const b=e.target.closest('[data-view]');if(!b)return;const v=b.dataset.view;
-  if(!['battle','characters','import','settings'].includes(v))return;
-  e.preventDefault();e.stopImmediatePropagation();
-  try{await prepare(v);replaying=true;b.click();replaying=false}catch(err){console.error(err);replaying=false;status('読み込みに失敗しました。ページを再読み込みしてください。')}
- },true);
- window.ParanoiseLoader={ensureBattle,ensureCharacters,ensureOCR,ensurePhase5,ensurePhase51,loaded,prepare};
+ async function ensurePhase52(){await ensurePhase51();return loadScript('phase5_2.js')}
+ async function ensurePhase53(){await ensurePhase52();return loadScript('phase5_3.js')}
+ async function prepare(v){if(v==='battle')return ensureBattle();if(v==='characters')return ensureCharacters();if(v==='import'){await loadScript('phase3.js');return ensureOCR()}if(v==='settings')return ensurePhase53()}
+ document.addEventListener('click',async e=>{if(replaying)return;const b=e.target.closest('[data-view]');if(!b)return;const v=b.dataset.view;if(!['battle','characters','import','settings'].includes(v))return;e.preventDefault();e.stopImmediatePropagation();try{await prepare(v);replaying=true;b.click();replaying=false}catch(err){console.error(err);replaying=false}});
+ window.ParanoiseLoader={ensureBattle,ensureCharacters,ensureOCR,ensurePhase5,ensurePhase51,ensurePhase52,ensurePhase53,loaded,prepare};
 })();
