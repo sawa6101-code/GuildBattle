@@ -1,0 +1,14 @@
+/* Phase 4.10 - 仕様変更監査・再現性固定
+ * Phase 4.9の自動修正を監査し、LOCKED実戦ケースの再現性・変更履歴・回帰結果を一元管理する。
+ * 仕様変更は黙って上書きせず、before/afterと根拠ケースを保存する。
+ */
+(function(){
+ const $=s=>document.querySelector(s),A=v=>Array.isArray(v)?v:[],now=()=>new Date().toISOString(),esc=s=>String(s??'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]));
+ async function settings(){try{return await all('settings')}catch{return[]}}
+ async function locked(){return (await settings()).filter(x=>String(x.key||'').startsWith('phase4_8_case_')&&x.approval_status==='LOCKED')}
+ async function audits(){return (await settings()).filter(x=>String(x.key||'').startsWith('phase4_9_verified_')||String(x.key||'').startsWith('phase4_10_audit_'))}
+ async function run(){const cs=await locked(), last=await settings();const patches=last.filter(x=>x.key==='phase4_9_last_patches')[0]?.patches||[];const audit={key:'phase4_10_audit_'+Date.now(),created_at:now(),locked_cases:cs.map(x=>x.id),case_count:cs.length,patches:JSON.parse(JSON.stringify(patches)),status:'CHECKING'};if(typeof put==='function')await put('settings',audit);let result=null;try{result=window.ParanoisePhase47?.runAll?await window.ParanoisePhase47.runAll():null;audit.regression=result;audit.status=result&&result.filter(x=>x.status==='FAIL'||x.status==='ERROR').length===0?'PASS':'FAIL';await put('settings',audit);render(await audits());return audit}catch(e){audit.status='ERROR';audit.error=e.message;await put('settings',audit);render(await audits());return audit}}
+ function render(list){const h=$('#phase410List');if(!h)return;const lockedCount=list.filter(x=>x.key?.startsWith('phase4_8_case_')).length;const runs=list.filter(x=>x.key?.startsWith('phase4_10_audit_')).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,10);h.innerHTML=`<div class="meta-grid"><div><b>監査対象LOCKED</b><span>${lockedCount}</span></div><div><b>監査履歴</b><span>${runs.length}</span></div></div>${runs.length?`<div class="table-wrap"><table><thead><tr><th>日時</th><th>ケース数</th><th>結果</th></tr></thead><tbody>${runs.map(x=>`<tr><td>${esc(x.created_at)}</td><td>${x.case_count??0}</td><td>${esc(x.status||'—')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="hint">監査履歴はまだありません。</p>'}`}
+ async function install(){if($('#phase410'))return;const b=$('#battle');if(!b)return;const x=document.createElement('div');x.id='phase410';x.className='card';x.innerHTML='<h3>🛡️ Phase 4.10 仕様変更監査・再現性</h3><p class="hint">LOCKED実戦ケース、Phase 4.9の仕様変更、回帰テスト結果を履歴として固定します。再実行して現在のエンジンが過去ケースを再現できるか確認できます。</p><button type="button" id="run410" class="wide primary">🛡️ 監査＋全回帰テストを実行</button><div id="phase410List"></div>';b.appendChild(x);render(await audits());$('#run410').onclick=async()=>{const r=await run();alert(`Phase 4.10監査完了：${r.status}`)}}
+ window.ParanoisePhase410={run,locked,audits};setTimeout(install,3500);new MutationObserver(install).observe(document.body,{subtree:true,childList:true});
+})();
