@@ -46,6 +46,14 @@
       "enabled": true,
       "endpoint": "https://www.gaming.kyuzitu.net/paranoizu/category/character-seinou-hyouka/",
       "format": "html"
+    },
+    {
+      "id": "gamerch-performance",
+      "type": "public_guide",
+      "priority": 4,
+      "enabled": true,
+      "endpoint": "https://gamerch.com/paranoize/",
+      "format": "html"
     }
   ]
 }
