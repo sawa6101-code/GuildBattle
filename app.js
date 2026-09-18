@@ -56,6 +56,17 @@ function setupAppUpdater(){
     reg.addEventListener('updatefound',()=>{const w=reg.installing;if(!w)return;w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller){showStatus('新しいバージョンを準備しました。');}})});
   }).catch(()=>{});
 }
+async function restoreGuildBattleData(){
+  const status=document.getElementById('recoveryStatus');
+  if(status)status.textContent='自軍・敵軍データを確認・復帰しています…';
+  try{
+    if(window.GuildBattleRecovery?.run) await window.GuildBattleRecovery.run();
+    else if(window.GuildBattleRecovery?.restoreIfMissing) await window.GuildBattleRecovery.restoreIfMissing();
+    await ensureOwn();await refreshStats();await renderOwn();await renderGuilds();await renderCharacters();
+    if(status)status.textContent='自軍・敵軍データの復帰確認が完了しました。';
+    alert('自軍・敵軍データの復帰確認が完了しました。');
+  }catch(e){console.error('recovery error',e);if(status)status.textContent='復帰に失敗しました。';alert('データ復帰に失敗しました。\\n'+(e?.message||String(e)));}
+}
 async function forceAppUpdate(){
   if(!('serviceWorker' in navigator))return location.reload();
   const status=document.getElementById('appUpdateStatus');if(status)status.textContent='最新版を確認中…';
@@ -69,7 +80,7 @@ async function forceAppUpdate(){
     if(status)status.textContent='現在すでに最新版です。';
   }catch(e){if(status)status.textContent='更新確認に失敗しました。再読み込みしてください。';}
 }
-window.openMember=openMember;window.openGuild=openGuild;window.addOwnMember=addOwnMember;window.openCharacterForm=openCharacterForm;window.saveParty=saveParty;window.deleteCharacter=deleteCharacter;window.showCharacterDetail=showCharacterDetail;
+window.restoreGuildBattleData=restoreGuildBattleData;window.openMember=openMember;window.openGuild=openGuild;window.addOwnMember=addOwnMember;window.openCharacterForm=openCharacterForm;window.saveParty=saveParty;window.deleteCharacter=deleteCharacter;window.showCharacterDetail=showCharacterDetail;
 function bindPlusButtons(){const ag=$('#addGuild');if(ag)ag.onclick=e=>{e.preventDefault();e.stopPropagation();addGuild().catch(err=>{console.error(err);alert('敵ギルド追加に失敗しました。')})};const nc=$('#newCharacter');if(nc)nc.onclick=e=>{e.preventDefault();e.stopPropagation();openCharacterForm()};const ao=$('#addOwn');if(ao)ao.onclick=e=>{e.preventDefault();e.stopPropagation();addOwnMember().catch(err=>{console.error(err);alert('自軍メンバー追加に失敗しました。')})}}
 const _show=show;show=async function(view){_show(view);setTimeout(bindPlusButtons,0)};
 setTimeout(bindPlusButtons,0);init();
