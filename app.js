@@ -1,5 +1,5 @@
 const DB_NAME='paranoise-guildbattle';
-const DB_VERSION=2;
+const DB_VERSION=3;
 const STORES=['guilds','members','parties','partyCharacters','characters','battleMatches','battleResults','fatigueHistory','screenshots','settings'];
 let db=null,currentGuildId=null,currentMemberId=null,memberReturnView='own';
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
