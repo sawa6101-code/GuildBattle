@@ -16,7 +16,8 @@ const PLAYERS=[
 {name:'くさなぎ',level:132,power:26517262,points:13340},
 {name:'ゆうまくんくん',level:133,power:24037819,points:8650},
 {name:'常時充電不足',level:135,power:23413088,points:1120},
-{name:'シャア・アズナブル',level:131,power:23191698,points:16340}
+{name:'シャア・アズナブル',level:131,power:23191698,points:16340},
+{name:'Free',level:0,power:0,points:0}
 ];
 const now=()=>new Date().toISOString(),uid=p=>p+'_'+crypto.randomUUID();
 function open(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,VER);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
