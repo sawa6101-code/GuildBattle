@@ -38,5 +38,5 @@ async function run(){
  await put(d,'settings',{key:'persistent_recovery_seed',version:'2026-09-18.1',protected:true,restored_at:now(),description:'Screenshot registration recovery baseline'});d.close();
  window.dispatchEvent(new CustomEvent('guildbattle-recovery-complete'));
 }
-setTimeout(()=>run().catch(e=>console.error('persistent recovery:',e)),500);
+setTimeout(()=>run().catch(e=>console.error('persistent recovery:',e)),2500);
 })();
