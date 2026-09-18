@@ -1,14 +1,9 @@
 {
   "version": 1,
-  "generated_at": "",
+  "generated_at": "2026-09-18T16:21:55.692678+00:00",
   "count": 0,
   "records": [],
-  "errors": [
-    {
-      "source": "bootstrap",
-      "error": "Scheduled GitHub Actions sync has not run yet."
-    }
-  ],
+  "errors": [],
   "source_priority": [
     "game_server",
     "public_api",
