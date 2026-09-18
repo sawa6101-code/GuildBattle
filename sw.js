@@ -1,4 +1,4 @@
-const CACHE='guildbattle-v20';
+const CACHE='guildbattle-v21';
 const ASSETS=['./','./index.html','./db-init.js','./character_skill_master_20260918.js','./style.css','./app.js','./lazy-load.js','./manifest.json','./character_master_catalog_20260918.js','./help.js','./phase4_2_character_master.js','./enemy_guild_seed_20260918.js','./own_players_seed_20260918.js','./party_seed_kuroronkotarezo_20260918.js','./persistent_recovery_seed.js','./guildbattle_recovery_store.js','./character_match_engine.js','./character_match_audit.js','./character_sync_engine.js','./data/character-sync-latest.json','./character_skill_sync_engine.js','./data/character-skill-sync-latest.json','./character_screenshot_binder.js'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
