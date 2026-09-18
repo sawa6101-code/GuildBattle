@@ -114,8 +114,17 @@ def main():
         except Exception as e: errors.append({"url":u,"error":str(e)})
     # merge by normalized card name, preserving source page and raw parsed spec
     merged={}
-    for x in records: merged[norm(x["name"])]=x
+    for x in records:
+        k=norm(x["name"])
+        if k not in merged or len(x.get("skills",[]))>len(merged[k].get("skills",[])): merged[k]=x
     OUT.parent.mkdir(parents=True,exist_ok=True)
+    existing={}
+    if OUT.exists():
+        try: existing=json.loads(OUT.read_text())
+        except Exception: existing={}
+    if not merged and existing.get("records"):
+        errors.append({"source":"guard","error":"No skill records parsed; previous non-empty snapshot preserved."})
+        merged={norm(x.get("name")):x for x in existing.get("records",[]) if x.get("name")}
     OUT.write_text(json.dumps({"version":2,"generated_at":now(),"count":len(merged),"records":list(merged.values()),"errors":errors},ensure_ascii=False,indent=2))
     print(json.dumps({"count":len(merged),"errors":len(errors)},ensure_ascii=False))
 
