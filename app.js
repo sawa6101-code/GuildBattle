@@ -40,7 +40,35 @@ if($('#saveScreenshot'))$('#saveScreenshot').onclick=async()=>{const f=$('#scree
 $('#exportData').onclick=async()=>{const out={schema_version:2,exported_at:now()};for(const s of STORES)out[s]=await all(s);const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='paranoise-guildbattle-backup-v2.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 $('#restoreInput').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async()=>{try{const data=JSON.parse(r.result);for(const s of STORES)for(const x of(data[s]||[]))await put(s,x);await ensureOwn();await refreshStats();await renderOwn();await renderGuilds();await renderCharacters();alert('データを復元しました。')}catch(err){console.error(err);alert('JSONの読み込みに失敗しました。')}};r.readAsText(f)});
 $('#resetData').onclick=async()=>{if(!confirm('すべての登録データを初期化します。よろしいですか？'))return;for(const s of STORES)await clear(s);await ensureOwn();await refreshStats();await renderOwn();await renderGuilds();await renderCharacters();alert('初期化しました。')};
-async function init(){await openDB();await ensureOwn();await refreshStats();await renderOwn();await renderCharacters();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{})}
+async function init(){await openDB();await ensureOwn();await refreshStats();await renderOwn();await renderCharacters();setupAppUpdater()}
+/* App update controller */
+const APP_VERSION='2026.09.19-v20';
+function setupAppUpdater(){
+  if(!('serviceWorker' in navigator))return;
+  let reloading=false;
+  const showStatus=t=>{const e=document.getElementById('appUpdateStatus');if(e)e.textContent=t};
+  const reloadOnce=()=>{if(reloading)return;reloading=true;showStatus('最新版を適用しています…');location.reload()};
+  navigator.serviceWorker.addEventListener('controllerchange',reloadOnce);
+  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{
+    const check=()=>reg.update().catch(()=>{});
+    check();setInterval(check,30*60*1000);
+    if(reg.waiting){showStatus('新しいバージョンがあります。');}
+    reg.addEventListener('updatefound',()=>{const w=reg.installing;if(!w)return;w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller){showStatus('新しいバージョンを準備しました。');}})});
+  }).catch(()=>{});
+}
+async function forceAppUpdate(){
+  if(!('serviceWorker' in navigator))return location.reload();
+  const status=document.getElementById('appUpdateStatus');if(status)status.textContent='最新版を確認中…';
+  try{
+    const reg=await navigator.serviceWorker.getRegistration();
+    if(!reg){location.reload();return;}
+    await reg.update();
+    const worker=reg.waiting||reg.installing;
+    if(reg.waiting){reg.waiting.postMessage({type:'SKIP_WAITING'});return;}
+    if(worker){worker.addEventListener('statechange',()=>{if(worker.state==='installed')worker.postMessage({type:'SKIP_WAITING'})});return;}
+    if(status)status.textContent='現在すでに最新版です。';
+  }catch(e){if(status)status.textContent='更新確認に失敗しました。再読み込みしてください。';}
+}
 window.openMember=openMember;window.openGuild=openGuild;window.addOwnMember=addOwnMember;window.openCharacterForm=openCharacterForm;window.saveParty=saveParty;window.deleteCharacter=deleteCharacter;window.showCharacterDetail=showCharacterDetail;
 function bindPlusButtons(){const ag=$('#addGuild');if(ag)ag.onclick=e=>{e.preventDefault();e.stopPropagation();addGuild().catch(err=>{console.error(err);alert('敵ギルド追加に失敗しました。')})};const nc=$('#newCharacter');if(nc)nc.onclick=e=>{e.preventDefault();e.stopPropagation();openCharacterForm()};const ao=$('#addOwn');if(ao)ao.onclick=e=>{e.preventDefault();e.stopPropagation();addOwnMember().catch(err=>{console.error(err);alert('自軍メンバー追加に失敗しました。')})}}
 const _show=show;show=async function(view){_show(view);setTimeout(bindPlusButtons,0)};
