@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "generated_at": "",
+  "count": 0,
+  "records": [],
+  "errors": [{"source":"bootstrap","error":"Scheduled skill/spec sync has not run yet."}]
+}
