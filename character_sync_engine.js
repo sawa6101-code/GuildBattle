@@ -77,6 +77,26 @@ async function fetchSource(source){
  if(source.format==='json'){let data;try{data=JSON.parse(text)}catch(e){throw new Error(source.id+' JSON parse error')}return extractJsonCharacters(data)}
  return extractGuideNames(text);
 }
+async function applySnapshot(data){
+ const d=await open(), chars=await all(d,'characters'), rows=Array.isArray(data?.records)?data.records:[], changes=[];
+ let next=1; const alloc=()=>{while(chars.some(c=>c.id===`CHR-${String(next).padStart(4,'0')}`))next++;return `CHR-${String(next++).padStart(4,'0')}`};
+ for(const raw of rows){
+  const name=raw.name||raw.characterName||raw.cardName||raw.title;if(!name)continue;
+  const key=norm(name);let c=chars.find(x=>norm(x.name)===key);
+  const incoming={name:String(name).trim(),rarity:String(raw.rarity||raw.rarityName||raw.rank||c?.rarity||'').toUpperCase(),element:raw.element||raw.attribute||c?.element||'',attack_type:raw.attack_type||raw.attackType||c?.attack_type||'',source:raw._source||raw.source||'public_source',source_url:raw._source_url||raw.source_url||'',source_checked:data.generated_at||now(),verification_status:Number(raw._priority||4)<=3?'server_synced':'public_source',verification_required:Number(raw._priority||4)>3,active:true,updated_at:now()};
+  if(raw.id||raw.characterId||raw.cardId)incoming.external_id=raw.id||raw.characterId||raw.cardId;
+  if(raw.skills||raw.skill_data)incoming.skill_data=raw.skill_data||{skills:raw.skills};
+  if(!c){c={id:alloc(),created_at:now()};Object.assign(c,incoming);await put(d,'characters',c);chars.push(c);changes.push({type:'ADD',id:c.id,name:c.name,source:c.source})}
+  else {const before=JSON.stringify({...c,updated_at:undefined,source_checked:undefined});Object.assign(c,incoming);const after=JSON.stringify({...c,updated_at:undefined,source_checked:undefined});if(before!==after){await put(d,'characters',c);changes.push({type:'UPDATE',id:c.id,name:c.name,source:c.source})}}
+ }
+ const meta={key:META_KEY,version:2,last_sync:now(),snapshot_generated_at:data.generated_at||'',after_count:(await all(d,'characters')).length,changes,errors:data.errors||[],mode:'snapshot'};
+ await put(d,'settings',meta);d.close();window.dispatchEvent(new CustomEvent('character-sync-complete',{detail:meta}));return meta;
+}
+async function loadLatestSnapshot(){
+ const r=await fetch('./data/character-sync-latest.json?ts='+Date.now(),{cache:'no-store'});
+ if(!r.ok)throw new Error('snapshot HTTP '+r.status);
+ return applySnapshot(await r.json());
+}
 async function sync(opts={}){
  const d=await open(),sources=(await getSources(d)).filter(s=>s.enabled&&s.endpoint).sort((a,b)=>a.priority-b.priority);
  const chars=await all(d,'characters'),before=chars.length,changes=[],errors=[],seen=new Map();
@@ -109,6 +129,7 @@ function installUI(){
  b.onclick=async()=>{b.disabled=true;b.textContent='同期中…';try{const r=await sync();alert(`キャラクター同期完了\\n${r.after_count}件 / 追加・更新 ${r.changes.length}件\\nエラー ${r.errors.length}件`);if(window.renderCharacters)window.renderCharacters()}catch(e){alert('同期失敗: '+e.message)}finally{b.disabled=false;b.textContent='🔄同期'}};
  sec.appendChild(b);
 }
-window.GuildBattleCharacterSync={sync,getSources};
-document.addEventListener('DOMContentLoaded',installUI);setTimeout(installUI,1000);
+async function auto(){try{const d=await open(),m=await get(d,'settings',META_KEY);d.close();const age=m?.snapshot_generated_at?Date.now()-Date.parse(m.snapshot_generated_at):Infinity;if(age>6*60*60*1000)await loadLatestSnapshot()}catch(e){console.warn('character sync auto:',e.message)}}
+window.GuildBattleCharacterSync={sync,loadLatestSnapshot,applySnapshot,getSources,auto};
+document.addEventListener('DOMContentLoaded',()=>{installUI();auto()});setTimeout(installUI,1000);
 })();
