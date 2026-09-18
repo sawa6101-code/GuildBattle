@@ -1,7 +1,7 @@
 /* GuildBattle Character ID verification dashboard */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle',VERSION=2;
+const DB='paranoise-guildbattle',VERSION=3;
 function open(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,VERSION);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 function all(d,n){return new Promise((res,rej)=>{const r=d.transaction(n).objectStore(n).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 async function audit(){
