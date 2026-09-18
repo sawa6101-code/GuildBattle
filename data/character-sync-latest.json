@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "generated_at": "",
+  "count": 0,
+  "records": [],
+  "errors": [
+    {
+      "source": "bootstrap",
+      "error": "Scheduled GitHub Actions sync has not run yet."
+    }
+  ],
+  "source_priority": [
+    "game_server",
+    "public_api",
+    "official_web_api",
+    "public_guide"
+  ]
+}
