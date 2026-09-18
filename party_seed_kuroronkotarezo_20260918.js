@@ -2,20 +2,20 @@
 (function(){
 const DB='paranoise-guildbattle',VER=2,PLAYER='クロろんこたれ蔵';
 const PARTIES=[
-{no:1,total:49855723,chars:[
-{pos:1,name:'蒼木 祥子（空腹の待ち合わせ）',level:101,power:1950000},
-{pos:2,name:'黒澤 アンナ（密室のミーティング）',level:25,power:260000},
-{pos:3,name:'鳳梨 麗華（夕立ちの迷子）',level:180,power:13510000},
-{pos:4,name:'柳葉 龍（遅れてきた男）',level:200,power:26150000},
-{pos:5,name:'宮本 蓮士（打ち明けた秘密）',level:101,power:2320000},
-{pos:6,name:'黒澤 アンナ（心を惑わす嘘）',level:130,power:5680000}]},
-{no:2,total:75195811,chars:[
+{no:1,total:75195811,chars:[
 {pos:1,name:'宮本 涼子（潮風とレモンの記憶）',level:186,power:13570000},
 {pos:2,name:'橘 結衣（その視線の先に）',level:111,power:4830000},
 {pos:3,name:'榊原大地（決戦前日）',level:200,power:18570000},
 {pos:4,name:'望月 那由多（今...見ましたよね？）',level:101,power:1320000},
 {pos:5,name:'本田 美波（デートじゃないよね？）',level:200,power:29940000},
 {pos:6,name:'蒼木 祥子（今夜のデザートは...）',level:150,power:6950000}]}
+{no:2,total:49855723,chars:[
+{pos:1,name:'蒼木 祥子（空腹の待ち合わせ）',level:101,power:1950000},
+{pos:2,name:'黒澤 アンナ（密室のミーティング）',level:25,power:260000},
+{pos:3,name:'鳳梨 麗華（夕立ちの迷子）',level:180,power:13510000},
+{pos:4,name:'柳葉 龍（遅れてきた男）',level:200,power:26150000},
+{pos:5,name:'宮本 蓮士（打ち明けた秘密）',level:101,power:2320000},
+{pos:6,name:'黒澤 アンナ（心を惑わす嘘）',level:130,power:5680000}]},
 ];
 const now=()=>new Date().toISOString();
 function open(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,VER);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
