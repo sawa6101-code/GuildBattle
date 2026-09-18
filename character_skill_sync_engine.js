@@ -39,9 +39,14 @@ async function applySnapshot(snapshot,{autoApprove=false}={}){
    const diffs=os?diffSkill(os,ns):[{field:'NEW_SKILL',before:null,after:ns}];
    if(diffs.length){
     const key='skill_spec_'+c.id+'_'+norm(ns.name);
+    const previous=(await all(d,'settings')).find(x=>x.key===key);
+    const sameAsPrevious=previous?.after && JSON.stringify(canonical(previous.after))===JSON.stringify(canonical(ns));
+    const observations=Number(previous?.observations||0)+1;
+    const consistency=previous ? (sameAsPrevious ? Math.min(1,(Number(previous.consistency||0)*Number(previous.observations||1)+1)/observations) : 0.5) : 1;
+    const confidence=Math.min(0.99,(1-Math.exp(-observations/3))*consistency);
     const candidate={key,character_id:c.id,character_name:c.name,skill_name:ns.name,
-      before:os||null,after:ns,diffs,source_url:incoming.source_url,
-      observations:1,consistency:1,confidence:0.33,status:autoApprove?'APPROVED':'PENDING_REVIEW',created_at:now(),updated_at:now()};
+      before:os||previous?.after||null,after:ns,diffs,source_url:incoming.source_url,
+      observations,consistency,confidence,status:autoApprove?'APPROVED':(confidence>=0.9?'READY_REVIEW':'PENDING_REVIEW'),created_at:previous?.created_at||now(),updated_at:now()};
     await put(d,'settings',candidate);pending.push(candidate);changes.push({character_id:c.id,skill:ns.name,diffs});
     if(autoApprove){c.skill_data=c.skill_data||{};c.skill_data.skills=oldSkills.filter(s=>norm(s.name)!==norm(ns.name)).concat([ns]);c.battle_profile=c.battle_profile||{};c.battle_profile.skills=c.skill_data.skills;c.updated_at=now();await put(d,'characters',c)}
    }
