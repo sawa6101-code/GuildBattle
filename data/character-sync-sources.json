@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "priority_order": [
+    "game_server",
+    "public_api",
+    "official_web_api",
+    "public_guide"
+  ],
+  "sources": [
+    {
+      "id": "game-server",
+      "type": "game_server",
+      "priority": 1,
+      "enabled": true,
+      "endpoint": "",
+      "format": "json"
+    },
+    {
+      "id": "public-api",
+      "type": "public_api",
+      "priority": 2,
+      "enabled": true,
+      "endpoint": "",
+      "format": "json"
+    },
+    {
+      "id": "official-web-api",
+      "type": "official_web_api",
+      "priority": 3,
+      "enabled": true,
+      "endpoint": "",
+      "format": "json"
+    },
+    {
+      "id": "paranavi-ssr",
+      "type": "public_guide",
+      "priority": 4,
+      "enabled": true,
+      "endpoint": "https://www.gaming.kyuzitu.net/paranoizu/ssrkyaraitiran/",
+      "format": "html"
+    },
+    {
+      "id": "paranavi-performance",
+      "type": "public_guide",
+      "priority": 4,
+      "enabled": true,
+      "endpoint": "https://www.gaming.kyuzitu.net/paranoizu/category/character-seinou-hyouka/",
+      "format": "html"
+    }
+  ]
+}
