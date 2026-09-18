@@ -1,8 +1,8 @@
 /* GuildBattle IndexedDB schema bootstrap v3 */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle',VERSION=3;
-const defs={guilds:'id',members:'id',parties:'id',partyCharacters:'id',characters:'id',battleMatches:'id',battleResults:'id',fatigueHistory:'id',screenshots:'id',settings:'key'};
+const DB='paranoise-guildbattle',VERSION=4;
+const defs={guilds:'id',members:'id',parties:'id',partyCharacters:'id',characters:'id',battleMatches:'id',battleResults:'id',fatigueHistory:'id',screenshots:'id',settings:'key',characterImages:'id',characterScreenshots:'id',characterSkillSources:'id'};
 const open=indexedDB.open(DB,VERSION);
 open.onupgradeneeded=()=>{
  const d=open.result;
