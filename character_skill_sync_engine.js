@@ -27,6 +27,7 @@ function parseCandidate(raw,source){
  const skills=Array.isArray(raw.skills)?raw.skills:[];
  return {name:raw.name,rarity:raw.rarity||'',source_url:raw.url||source||'',skills:skills.map(canonical),checked_at:now()};
 }
+async function loadLatestSnapshot(opts={}){const r=await fetch('./data/character-skill-sync-latest.json?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('skill snapshot HTTP '+r.status);return applySnapshot(await r.json(),opts)}
 async function applySnapshot(snapshot,{autoApprove=false}={}){
  const d=await open(),chars=await all(d,'characters'),changes=[],pending=[];
  for(const raw of (snapshot.records||[])){
@@ -60,5 +61,6 @@ async function approve(key){
 async function listPending(){
  const d=await open(),r=(await all(d,'settings')).filter(x=>x.key&&String(x.key).startsWith('skill_spec_')&&x.status!=='APPROVED');d.close();return r;
 }
-window.GuildBattleSkillSync={applySnapshot,approve,listPending,diffSkill,canonical};
+window.GuildBattleSkillSync={loadLatestSnapshot,applySnapshot,approve,listPending,diffSkill,canonical};
+document.addEventListener('DOMContentLoaded',()=>{loadLatestSnapshot().catch(()=>{})});
 })();
