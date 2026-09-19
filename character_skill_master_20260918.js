@@ -4,6 +4,13 @@
 'use strict';
 const DB='paranoise-guildbattle',V=3;
 const M=[
+{name:'橘 結衣（その視線の先に）',rarity:'SSR',element:'地',attack_type:'特殊アタッカー',max_mp:6,
+ passives:[{name:'復讐スリープ(2体)',trigger:'敵の攻撃で戦闘不能',effect:'その敵と別のランダムな敵1体を睡眠状態にする',awakening_rates:[10,20,40,70,100],status:'sleep'}],
+ skills:[
+  {name:'HP反転',type:'hp_swap',target:'self',condition:{hp_below:0.30},tu:100,mp_cost:3},
+  {name:'EXスリープ(2体)',type:'status',target:'enemy_2',status:'sleep',tu:160,ex:true,once_per_battle:true,mp_cost:0},
+  {name:'サバイバー',type:'damage',target:'enemy_single',multiplier:5,condition:{survive_tu:300},tu:130},
+  {name:'アタック',type:'damage',target:'enemy_single',multiplier:1,tu:130}] ,source:'user_screenshot',source_checked:'2026-09-19',screenshot_evidence:'IMG_0456.png',verification_status:'user_confirmed',verification_required:false},
 {name:'天草 仁（鳳梨に忠誠を誓った男）',rarity:'SR',element:'闇',attack_type:'特殊アタッカー',
  passives:[{name:'—',effect:'パッシブなし'}],
  skills:[
