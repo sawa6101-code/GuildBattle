@@ -14,7 +14,7 @@ function visualSim(a,b){if(!a||!b||a.length!==b.length)return 0;let e=0;for(let 
 async function allStore(db,n){return new Promise((res,rej)=>{const r=db.transaction(n).objectStore(n).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 async function put(db,n,x){return new Promise((res,rej)=>{const r=db.transaction(n,'readwrite').objectStore(n).put(x);r.onsuccess=()=>res(x);r.onerror=()=>rej(r.error)})}
 async function match(name,opts={}){
- const chars=opts.characters||await allStore(opts.db||await new Promise((res,rej)=>{const r=indexedDB.open(DB,3);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}),'characters');
+ const chars=opts.characters||await allStore(opts.db||await new Promise((res,rej)=>{const r=indexedDB.open(DB,4);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}),'characters');
  const rows=chars.map(c=>{const ns=scoreName(name,c.name);const fuzzy=editSim(name,c.name);return {id:c.id,name:c.name,rarity:c.rarity,element:c.element,nameScore:ns,fuzzyScore:fuzzy,imageScore:null,stage:ns===1?'EXACT':ns>=.98?'NORMALIZED':ns>=.78?'TITLE':fuzzy>=.75?'FUZZY':'NONE',score:Math.max(ns,fuzzy*.82)}}).sort((a,b)=>b.score-a.score);
  const top=rows.slice(0,5);
  if(top[0]?.stage==='EXACT')return {status:'CONFIRMED',stage:1,character_id:top[0].id,candidates:top};
@@ -23,10 +23,10 @@ async function match(name,opts={}){
  return {status:'UNMATCHED',stage:4,character_id:null,candidates:top};
 }
 async function confirm(partyCharacterId,characterId){
- const db=await new Promise((res,rej)=>{const r=indexedDB.open(DB,3);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+ const db=await new Promise((res,rej)=>{const r=indexedDB.open(DB,4);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
  const pcs=await allStore(db,'partyCharacters');const p=pcs.find(x=>x.id===partyCharacterId);if(!p)throw Error('partyCharactersが見つかりません');const c=await new Promise((res,rej)=>{const r=db.transaction('characters').objectStore('characters').get(characterId);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});if(!c)throw Error('キャラクターIDが見つかりません');p.character_id=c.id;p.character_name=c.name;p.match_status='CONFIRMED';p.match_stage=5;p.match_confidence=1;p.match_confirmed_at=new Date().toISOString();await put(db,'partyCharacters',p);return p}
 async function verifyParty(partyId){
- const db=await new Promise((res,rej)=>{const r=indexedDB.open(DB,3);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+ const db=await new Promise((res,rej)=>{const r=indexedDB.open(DB,4);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
  const [pcs,chars]=await Promise.all([allStore(db,'partyCharacters'),allStore(db,'characters')]);const out=[];
  for(const p of pcs.filter(x=>x.party_id===partyId).sort((a,b)=>a.position-b.position)){const name=p.character_name_snapshot||p.character_name||chars.find(c=>c.id===p.character_id)?.name||'';const m=await match(name,{db,characters:chars});out.push({...p,recognized:name,match:m})}
  return out
@@ -34,7 +34,7 @@ async function verifyParty(partyId){
 function install(){
  const run=async()=>{
   const box=document.querySelector('#partyEditor');if(!box||box.querySelector('.match-panel'))return;
-  const cards=[...box.querySelectorAll('.party')];const parties=await (async()=>{const db=await new Promise((res,rej)=>{const r=indexedDB.open(DB,3);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});return allStore(db,'parties')})();
+  const cards=[...box.querySelectorAll('.party')];const parties=await (async()=>{const db=await new Promise((res,rej)=>{const r=indexedDB.open(DB,4);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});return allStore(db,'parties')})();
   cards.forEach(async card=>{const s=card.querySelector('summary');const txt=s?.textContent||'';const n=Number((txt.match(/(\\d+)/)||[])[1]);const p=parties.find(x=>x.member_id===window.__guildBattleCurrentMemberId&&Number(x.party_no)===n);if(!p)return;const panel=document.createElement('div');panel.className='match-panel card';panel.innerHTML='<h4>🧬 キャラクターID照合</h4><div class="match-status">照合中…</div><div class="match-rows"></div>';card.querySelector('.party-body')?.appendChild(panel);try{const rows=await verifyParty(p.id);const rs=panel.querySelector('.match-rows');let ok=0,cand=0,none=0;rs.innerHTML=rows.map(x=>{const m=x.match;if(m.status==='CONFIRMED')ok++;else if(m.status==='CANDIDATE')cand++;else none++;const icon=m.status==='CONFIRMED'?'🟢':m.status==='CANDIDATE'?'🟡':'🔴';const candText=(m.candidates||[]).slice(0,2).map(c=>c.id).join(' / ');return '<div class="match-row"><span>'+x.position+'</span><b>'+icon+'</b><span class="match-name">'+escSafe(x.recognized)+'</span><span class="match-id">'+(m.character_id||candText||'未照合')+'</span></div>'}).join('');panel.querySelector('.match-status').textContent='🟢 確定 '+ok+'　🟡 候補 '+cand+'　🔴 未照合 '+none+'　（5段階照合）'}catch(e){panel.querySelector('.match-status').textContent='照合エラー: '+e.message}});
  };
  setTimeout(run,150);
