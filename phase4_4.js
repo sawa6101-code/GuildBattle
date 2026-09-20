@@ -35,7 +35,7 @@
       if(n.includes('オートスタン')){if(Math.random()<=chance)setStatus(target,{name:stunName,tu:70},log)}
     }
   }
-  function applyPassiveHit(target,attacker,log){for(const p of arr(target.profile?.passives)){const n=String(p.name||''),tr=String(p.trigger||'');if(!/攻撃|被攻撃/.test(tr))continue;let chance=chanceFor(p,target);if(Math.random()>chance)continue;if(n.includes('反撃体勢')){attacker.readyAt=Math.max(0,attacker.readyAt-100);log.push(`${target.name} 反撃体勢 → ${attacker.name}の次回行動を100TU短縮`)}if(n.includes('スタンスキン')||n.includes('オートスタン'))setStatus(attacker,{name:stunName,tu:n.includes('スタンスキン')?100:70},log);
+  function applyPassiveHit(target,attacker,log){for(const p of arr(target.profile?.passives)){const n=String(p.name||''),tr=String(p.trigger||'');const known=/スタンスキン|スリープスキン|ポイズンスキン|オートガード|オートスタン/.test(n);if(!known&&!/攻撃|被攻撃/.test(tr))continue;let chance=chanceFor(p,target);if(Math.random()>chance)continue;if(n.includes('反撃体勢')){attacker.readyAt=Math.max(0,attacker.readyAt-100);log.push(`${target.name} 反撃体勢 → ${attacker.name}の次回行動を100TU短縮`)}if(n.includes('スタンスキン')||n.includes('オートスタン'))setStatus(attacker,{name:stunName,tu:n.includes('スタンスキン')?100:70},log);
 if(n.includes('ポイズンスキン'))setStatus(attacker,{name:poisonName,tu:100},log);
 if(n.includes('スリープスキン'))setStatus(attacker,{name:sleepName,tu:100},log)}}
   function triggerEntry(u,enemy,log){
