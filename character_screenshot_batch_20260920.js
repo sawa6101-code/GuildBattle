@@ -11,13 +11,13 @@ const R=[
  {name:'宮本 蓮士（打ち明けた秘密）',rarity:'SSR',title:'打ち明けた秘密',skills:['入場スリープ(2体)（各10%）','孤軍奮闘（70TU・6倍・最後の1人）','ドリームハンター（130TU・6倍・睡眠対象）','EX戦術的撤退（0TU）','アタック'],source:'画像(5).jpeg'},
  {name:'蒼木 祥子（空腹の待ち合わせ）',rarity:'SSR',title:'空腹の待ち合わせ',skills:['オートポイズン（10%）','復讐ポイズン（100%）','逆境ドレイン（160TU・3MP・5倍・HP30%未満）','ポイズンイーター（130TU・4倍）'],source:'画像(5).jpeg'},
  {name:'リューグーン（時を忘れた海底の主）',rarity:'SR',title:'時を忘れた海底の主',skills:['アタック'],source:'画像(20260920-045510).jpeg',provisional:true},
- {name:'ネイサン（ネコ科最強のエージェント）',rarity:'SR',title:'ネコ科最強のエージェント',skills:['アタック（2体）'],source:'画像(4).jpeg'},
+ {name:'ネイサン（ネコ科最強のエージェント）',rarity:'SR',title:'ネコ科最強のエージェント',skills:['アタック（2体）'],source:'画像(20260920-045510).jpeg'},
  {name:'ビューマルゴ（不死身な黄金色の猛獣）',rarity:'SR',title:'不死身な黄金色の猛獣',skills:['アタック（2体）'],source:'画像(20260920-045510).jpeg',provisional:true},
- {name:'コロコニー（輝きする二本の牙）',rarity:'SR',title:'輝きする二本の牙',skills:['アタック（2体）'],source:'画像(4).jpeg',provisional:true},
- {name:'シャルロッテ（とってもふわふわお嬢様）',rarity:'SR',title:'とってもふわふわお嬢様',skills:['アタック'],source:'画像(4).jpeg',provisional:true},
- {name:'オージュゴン（見たら忘れてほしい）',rarity:'SR',title:'見たら忘れてほしい',skills:['アタック（2体）'],source:'画像(4).jpeg',provisional:true},
- {name:'ヌメテューサ（双メメった大群にとりこまれる）',rarity:'SR',title:'双メメった大群にとりこまれる',skills:['アタック（全体）'],source:'画像(4).jpeg',provisional:true},
- {name:'ナンヨウ（ゾト目で世界を掌握）',rarity:'SR',title:'ゾト目で世界を掌握',skills:['アタック（2体）'],source:'画像(4).jpeg',provisional:true}
+ {name:'コロコニー（輝きする二本の牙）',rarity:'SR',title:'輝きする二本の牙',skills:['アタック（2体）'],source:'画像(20260920-045510).jpeg',provisional:true},
+ {name:'シャルロッテ（とってもふわふわお嬢様）',rarity:'SR',title:'とってもふわふわお嬢様',skills:['アタック'],source:'画像(20260920-045510).jpeg',provisional:true},
+ {name:'オージュゴン（見たら忘れてほしい）',rarity:'SR',title:'見たら忘れてほしい',skills:['アタック（2体）'],source:'画像(20260920-045510).jpeg',provisional:true},
+ {name:'ヌメテューサ（双メメった大群にとりこまれる）',rarity:'SR',title:'双メメった大群にとりこまれる',skills:['アタック（全体）'],source:'画像(20260920-045510).jpeg',provisional:true},
+ {name:'ナンヨウ（ゾト目で世界を掌握）',rarity:'SR',title:'ゾト目で世界を掌握',skills:['アタック（2体）'],source:'画像(20260920-045510).jpeg',provisional:true}
 ];
 const open=()=>new Promise((res,rej)=>{const r=indexedDB.open(DB);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const all=(d,n)=>new Promise((res,rej)=>{const r=d.transaction(n).objectStore(n).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
