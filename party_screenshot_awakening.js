@@ -21,7 +21,7 @@ function nameMatch(text,chars){
  return chars.map(c=>{const n=norm(c.name);const exact=t.includes(n)&&n.length>0?1:0;const fuzzy=levenshtein(t,c.name);const title=(c.name.match(/[（(]([^）)]+)[）)]/)||[])[1];const titleHit=title&&t.includes(norm(title))?.82:0;return {...c,score:Math.max(exact,fuzzy,titleHit)}}).sort((a,b)=>b.score-a.score).slice(0,5)
 }
 function ocrText(data){
- if(!window.Tesseract)return Promise.resolve('');
+ if(!window.Tesseract){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=res;s.onerror=()=>rej(new Error('OCRエンジンの読み込みに失敗しました'));document.head.appendChild(s)});}
  return Tesseract.recognize(data,'jpn+eng',{logger:()=>{}}).then(r=>r?.data?.text||'').catch(()=> '');
 }
 /* Detects explicit ★/☆ notation first. Then common Japanese UI labels such as 凸3, 覚醒3.
@@ -56,7 +56,7 @@ function visualAwakening(data){
 async function analyze(file,partyId){
  const db=await openDB();const chars=await all(db,'characters');const src=await readImage(file);const im=await loadImg(src);
  const w=im.naturalWidth||im.width,h=im.naturalHeight||im.height;
- const cols=2,rows=3, gapX=.012,gapY=.012;
+ const landscape=w/h>=1.2;const cols=landscape?3:2,rows=landscape?2:3, gapX=.012,gapY=.012;
  const out=[];
  for(let i=0;i<6;i++){
    const col=i%cols,row=Math.floor(i/cols);
