@@ -20,7 +20,7 @@ function nameMatch(text,chars){
  const t=norm(text);
  return chars.map(c=>{const n=norm(c.name);const exact=t.includes(n)&&n.length>0?1:0;const fuzzy=levenshtein(t,c.name);const title=(c.name.match(/[（(]([^）)]+)[）)]/)||[])[1];const titleHit=title&&t.includes(norm(title))?.82:0;return {...c,score:Math.max(exact,fuzzy,titleHit)}}).sort((a,b)=>b.score-a.score).slice(0,5)
 }
-function ocrText(data){
+async function ocrText(data){
  if(!window.Tesseract){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=res;s.onerror=()=>rej(new Error('OCRエンジンの読み込みに失敗しました'));document.head.appendChild(s)});}
  return Tesseract.recognize(data,'jpn+eng',{logger:()=>{}}).then(r=>r?.data?.text||'').catch(()=> '');
 }
