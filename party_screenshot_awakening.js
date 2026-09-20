@@ -84,12 +84,27 @@ async function apply(result,manual={}){
  }
  return saved;
 }
+async function refreshTargetParties(){
+ const box=document.querySelector('#partyShotAwake');
+ const sel=document.querySelector('#psaParty');
+ const memberId=window.__guildBattleCurrentMemberId;
+ if(!box||!sel||!memberId)return;
+ try{
+  const db=await openDB();
+  const ps=(await all(db,'parties')).filter(p=>p.member_id===memberId).sort((a,b)=>Number(a.party_no)-Number(b.party_no));
+  const old=sel.value;
+  sel.innerHTML=ps.map(p=>'<option value="'+esc(p.id)+'">PT'+p.party_no+(p.name?' ・ '+esc(p.name):'')+'</option>').join('');
+  if(old&&ps.some(p=>p.id===old))sel.value=old;
+  if(!ps.length)sel.innerHTML='<option value="">PTが登録されていません</option>';
+ }catch(e){console.error('PT selector refresh error',e);sel.innerHTML='<option value="">PT取得エラー</option>';}
+}
 function install(){
- const host=document.querySelector('#memberDetail');if(!host||host.querySelector('#partyShotAwake'))return;
+ const host=document.querySelector('#memberDetail');if(!host)return;
+ const existing=host.querySelector('#partyShotAwake');
+ if(existing){refreshTargetParties();return;}
  const box=document.createElement('div');box.id='partyShotAwake';box.className='card';box.innerHTML='<h3>📷 PTスクショ → 6枠＋現在の凸数を自動設定</h3><p class="hint">PT編成画面のスクショを1枚添付すると、6枠のキャラクターIDと★0～★4（凸数）をOCR＋画像解析します。高信頼の結果はそのまま反映し、低信頼だけ確認できます。</p><label>対象PT<select id="psaParty"></select></label><input id="psaFile" type="file" accept="image/*"><button type="button" class="wide primary" id="psaAnalyze">🔍 6枠＋凸数を自動認識</button><div id="psaStatus" class="hint"></div><div id="psaResults"></div>';
  host.prepend(box);
- const refresh=async()=>{const db=await openDB();const ps=(await all(db,'parties')).filter(p=>p.member_id===window.__guildBattleCurrentMemberId).sort((a,b)=>a.party_no-b.party_no);$('#psaParty').innerHTML=ps.map(p=>'<option value="'+esc(p.id)+'">PT'+p.party_no+'</option>').join('')};
- refresh();
+ refreshTargetParties();
  $('#psaAnalyze').onclick=async()=>{const f=$('#psaFile')?.files?.[0],pid=$('#psaParty')?.value;if(!f||!pid)return alert('対象PTとスクショを指定してください。');$('#psaStatus').textContent='解析中…（OCR＋6枠照合＋凸数認識）';try{const r=await analyze(f,pid);window.__partyScreenshotAwakeningLast=r;const auto={};let autoCount=0;r.slots.forEach(s=>{if(s.character_id&&s.name_confidence>=.9&&s.awakening!==null&&s.awakening_confidence>=.9){auto[s.position]={character_id:s.character_id,awakening:s.awakening};autoCount++}});if(autoCount)await apply(r,auto);renderResult(r);$('#psaStatus').textContent='解析完了。🟢高信頼 '+autoCount+'枠は自動反映済み。🟡/🔴は下の結果を確認して確定してください。'}catch(e){console.error(e);$('#psaStatus').textContent='解析エラー: '+e.message}};
 };
 function renderResult(r){
@@ -101,7 +116,7 @@ function renderResult(r){
  }).join('')+'<button type="button" class="wide primary" id="psaApply">✅ この6枠をPTへ確定</button>';
  $('#psaApply').onclick=async()=>{const manual={};box.querySelectorAll('[data-psa-pos]').forEach(el=>{manual[Number(el.dataset.psaPos)]={character_id:el.querySelector('.psaChar')?.value||null,awakening:Number(el.querySelector('.psaAw')?.value||0)}});try{const n=await apply(r,manual);alert(n+'枠をPTへ反映しました。');if(typeof openMember==='function')openMember(window.__guildBattleCurrentMemberId,window.memberReturnView||'own')}catch(e){alert('反映に失敗しました: '+e.message)}};
 }
-window.ParanoisePartyScreenshotAwakening={VERSION,analyze,apply};
+window.ParanoisePartyScreenshotAwakening={VERSION,analyze,apply,refreshTargetParties};
 document.addEventListener('DOMContentLoaded',()=>setTimeout(install,300));
 new MutationObserver(()=>setTimeout(install,50)).observe(document.body,{childList:true,subtree:true});
 })();
