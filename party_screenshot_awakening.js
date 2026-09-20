@@ -90,7 +90,7 @@ function install(){
  host.prepend(box);
  const refresh=async()=>{const db=await openDB();const ps=(await all(db,'parties')).filter(p=>p.member_id===window.__guildBattleCurrentMemberId).sort((a,b)=>a.party_no-b.party_no);$('#psaParty').innerHTML=ps.map(p=>'<option value="'+esc(p.id)+'">PT'+p.party_no+'</option>').join('')};
  refresh();
- $('#psaAnalyze').onclick=async()=>{const f=$('#psaFile')?.files?.[0],pid=$('#psaParty')?.value;if(!f||!pid)return alert('対象PTとスクショを指定してください。');$('#psaStatus').textContent='解析中…（OCR＋6枠照合＋凸数認識）';try{const r=await analyze(f,pid);window.__partyScreenshotAwakeningLast=r;renderResult(r);$('#psaStatus').textContent='解析完了。🟢高信頼は自動反映候補、🟡要確認は手動修正後に確定できます。'}catch(e){console.error(e);$('#psaStatus').textContent='解析エラー: '+e.message}};
+ $('#psaAnalyze').onclick=async()=>{const f=$('#psaFile')?.files?.[0],pid=$('#psaParty')?.value;if(!f||!pid)return alert('対象PTとスクショを指定してください。');$('#psaStatus').textContent='解析中…（OCR＋6枠照合＋凸数認識）';try{const r=await analyze(f,pid);window.__partyScreenshotAwakeningLast=r;const auto={};let autoCount=0;r.slots.forEach(s=>{if(s.character_id&&s.name_confidence>=.9&&s.awakening!==null&&s.awakening_confidence>=.9){auto[s.position]={character_id:s.character_id,awakening:s.awakening};autoCount++}});if(autoCount)await apply(r,auto);renderResult(r);$('#psaStatus').textContent='解析完了。🟢高信頼 '+autoCount+'枠は自動反映済み。🟡/🔴は下の結果を確認して確定してください。'}catch(e){console.error(e);$('#psaStatus').textContent='解析エラー: '+e.message}};
 };
 function renderResult(r){
  const box=$('#psaResults');if(!box)return;
