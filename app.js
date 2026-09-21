@@ -80,7 +80,7 @@ async function forceAppUpdate(){
     if(status)status.textContent='現在すでに最新版です。';
   }catch(e){if(status)status.textContent='更新確認に失敗しました。再読み込みしてください。';}
 }
-window.restoreGuildBattleData=restoreGuildBattleData;window.openMember=openMember;window.openGuild=openGuild;window.addOwnMember=addOwnMember;window.openCharacterForm=openCharacterForm;window.saveParty=saveParty;window.deleteCharacter=deleteCharacter;window.showCharacterDetail=showCharacterDetail;
+window.restoreGuildBattleData=restoreGuildBattleData;window.openMember=openMember;window.openGuild=openGuild;window.addOwnMember=addOwnMember;window.openCharacterForm=openCharacterForm;window.saveParty=saveParty;window.deleteCharacter=deleteCharacter;window.showCharacterDetail=showCharacterDetail;window.renderCharacters=renderCharacters;window.refreshStats=refreshStats;
 function bindPlusButtons(){const ag=$('#addGuild');if(ag)ag.onclick=e=>{e.preventDefault();e.stopPropagation();addGuild().catch(err=>{console.error(err);alert('敵ギルド追加に失敗しました。')})};const nc=$('#newCharacter');if(nc)nc.onclick=e=>{e.preventDefault();e.stopPropagation();openCharacterForm()};const ao=$('#addOwn');if(ao)ao.onclick=e=>{e.preventDefault();e.stopPropagation();addOwnMember().catch(err=>{console.error(err);alert('自軍メンバー追加に失敗しました。')})}}
 const _show=show;show=async function(view){_show(view);setTimeout(bindPlusButtons,0)};
 setTimeout(bindPlusButtons,0);init();
