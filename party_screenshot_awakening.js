@@ -91,7 +91,19 @@ async function refreshTargetParties(){
  if(!box||!sel||!memberId)return;
  try{
   const db=await openDB();
-  const ps=(await all(db,'parties')).filter(p=>p.member_id===memberId).sort((a,b)=>Number(a.party_no)-Number(b.party_no));
+  let ps=(await all(db,'parties')).filter(p=>String(p.member_id??p.memberId)===String(memberId)).sort((a,b)=>Number(a.party_no??a.partyNo)-Number(b.party_no??b.partyNo));
+  if(ps.length<2){
+   const member=(await all(db,'members')).find(m=>String(m.id)===String(memberId));
+   if(member){
+    for(let n=1;n<=2;n++){
+     if(!ps.some(p=>Number(p.party_no??p.partyNo)===n)){
+      const p={id:'party_'+crypto.randomUUID(),member_id:member.id,party_no:n,name:'PT'+n,total_power:0,hp_current:0,hp_max:0,fatigue_value:0,fatigue_multiplier:1,battle_count:0,win_count:0,loss_count:0,draw_count:0,active:true,created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+      await put(db,'parties',p); ps.push(p);
+     }
+    }
+    ps.sort((a,b)=>Number(a.party_no??a.partyNo)-Number(b.party_no??b.partyNo));
+   }
+  }
   const old=sel.value;
   sel.innerHTML=ps.map(p=>'<option value="'+esc(p.id)+'">PT'+p.party_no+(p.name?' ・ '+esc(p.name):'')+'</option>').join('');
   if(old&&ps.some(p=>p.id===old))sel.value=old;
