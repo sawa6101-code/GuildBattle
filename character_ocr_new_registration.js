@@ -52,7 +52,7 @@ async function analyze(){
  const f=$('#ocrNewCharacterFile')?.files?.[0];if(!f)return alert('キャラクタースクショを選択してください。');
  const status=$('#ocrNewCharacterStatus'),preview=$('#ocrNewCharacterPreview');status.textContent='OCR解析中…';preview.innerHTML='';
  try{
-  const d=await openDB(),chars=await all(d,'characters');d.close(),blob=await fileData(f),text=await ocr(blob),info=findName(text,chars);
+  const d=await openDB(),chars=await all(d,'characters');d.close();const blob=await fileData(f),text=await ocr(blob),info=findName(text,chars);
   const skills=[];for(const sf of [...($('#ocrNewSkillFiles')?.files||[])])skills.push(...parseSkills(await ocr(await fileData(sf))));
   const stats=parseStats(text),rarity=findRarity(text),element=findElement(text),title=findTitle(text,info.name),duplicate=info.existing;
   window.__ocrNewCharacterCtx={blob,text,chars,duplicate,skills,stats,rarity,element,title,name:info.name,filename:f.name};
