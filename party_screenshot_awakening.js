@@ -6,7 +6,7 @@
 (function(){
 'use strict';
 const DB='paranoise-guildbattle';
-const VERSION='1.0.0';
+const VERSION='2.0.0';
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const norm=s=>String(s??'').normalize('NFKC').replace(/[\s　]+/g,'').toLowerCase();
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
@@ -16,6 +16,23 @@ function readImage(file){return new Promise((res,rej)=>{const fr=new FileReader(
 function loadImg(src){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error('画像を読み込めません'));im.src=src})}
 function cropData(im,x,y,w,h){const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w));c.height=Math.max(1,Math.round(h));c.getContext('2d').drawImage(im,x,y,w,h,0,0,w,h);return c.toDataURL('image/jpeg',.88)}
 function levenshtein(a,b){a=norm(a);b=norm(b);if(!a||!b)return 0;const d=Array.from({length:a.length+1},(_,i)=>i);for(let j=1;j<=b.length;j++){let prev=d[0];d[0]=j;for(let i=1;i<=a.length;i++){const old=d[i];d[i]=Math.min(d[i]+1,d[i-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=old}}return 1-d[a.length]/Math.max(a.length,b.length)}
+function imageFeature(data){
+ return loadImg(data).then(im=>{
+  const c=document.createElement('canvas'),w=16,h=16;c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);
+  const p=c.getContext('2d').getImageData(0,0,w,h).data,v=[];for(let i=0;i<p.length;i+=4){v.push(Math.round(p[i]/32)/8,Math.round(p[i+1]/32)/8,Math.round(p[i+2]/32)/8)}return v;
+ });
+}
+function featureSimilarity(a,b){if(!a||!b||a.length!==b.length)return 0;let d=0;for(let i=0;i<a.length;i++){const x=a[i]-b[i];d+=x*x}return Math.max(0,1-Math.sqrt(d/a.length)*2)}
+async function imageCandidates(data,chars){
+ const db=await openDB();let imgs=[];try{imgs=await all(db,'characterImages')}catch{}db.close();
+ const q=await imageFeature(data),out=[];
+ for(const im of imgs){
+  if(!im.character_id||!im.blob)continue;
+  try{const f=await imageFeature(im.blob);const s=featureSimilarity(q,f);if(s>0)out.push({id:im.character_id,score:s})}catch{}
+ }
+ const best={};for(const x of out)if(!best[x.id]||best[x.id].score<x.score)best[x.id]=x.score;
+ return Object.entries(best).map(([id,score])=>{const c=chars.find(x=>x.id===id);return c?{...c,score}:null}).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,5);
+}
 function nameMatch(text,chars){
  const t=norm(text);
  return chars.map(c=>{const n=norm(c.name);const exact=t.includes(n)&&n.length>0?1:0;const fuzzy=levenshtein(t,c.name);const title=(c.name.match(/[（(]([^）)]+)[）)]/)||[])[1];const titleHit=title&&t.includes(norm(title))?.82:0;return {...c,score:Math.max(exact,fuzzy,titleHit)}}).sort((a,b)=>b.score-a.score).slice(0,5)
@@ -27,6 +44,18 @@ async function ocrText(data){
 /* Detects explicit ★/☆ notation first. Then common Japanese UI labels such as 凸3, 覚醒3.
    A visual fallback counts separated bright star-like components in the lower part of a slot.
    The fallback is deliberately confidence-limited because card art can create false positives. */
+function detectStarVisual(data){
+ return loadImg(data).then(im=>{
+  const w=im.naturalWidth||im.width,h=im.naturalHeight||im.height;
+  const c=document.createElement('canvas'),cw=Math.max(1,Math.round(w*.65)),ch=Math.max(1,Math.round(h*.18));
+  c.width=cw;c.height=ch;c.getContext('2d').drawImage(im,Math.round(w*.18),Math.round(h*.77),cw,ch,0,0,cw,ch);
+  const p=c.getContext('2d').getImageData(0,0,cw,ch).data,bins=[0,0,0,0,0];
+  for(let i=0;i<p.length;i+=4){const r=p[i],g=p[i+1],b=p[i+2];if(r>165&&g>140&&b<150&&r+b<g*2.1){const x=((i/4)%cw)/cw;bins[Math.min(4,Math.floor(x*5))]++}}
+  const threshold=Math.max(8,cw*ch*.004),active=bins.filter(v=>v>=threshold).length;
+  if(active>=1&&active<=4)return {value:active,confidence:.68,source:'visual_star'};
+  return {value:null,confidence:0,source:'visual_none'};
+ })
+}
 function parseAwakeningText(text){
  const t=String(text||'').replace(/[☆✦✧]/g,'★');
  let m=t.match(/(?:凸|覚醒|限界突破|突破)\s*[:：]?\s*([0-4])/);
@@ -64,11 +93,11 @@ async function analyze(file,partyId){
    const data=cropData(im,x,y,cw,ch);
    const text=await ocrText(data);
    const matches=nameMatch(text,chars);
-   const nm=matches[0]||null;
+   const visual=await imageCandidates(data,chars); const merged=[...matches,...visual].reduce((m,x)=>{const old=m.get(x.id);if(!old||x.score>old.score)m.set(x.id,x);return m},new Map()); const ranked=[...merged.values()].sort((a,b)=>b.score-a.score); const nm=ranked[0]||null; matches.splice(0,matches.length,...ranked.slice(0,5));
    const awText=parseAwakeningText(text);
-   const aw=awText.value!==null?awText:await visualAwakening(data);
-   const confidence=nm?.score?Math.min(1,nm.score*(aw.confidence||.7)):0;
-   out.push({position:i+1,crop:data,ocr:text,candidates:matches.slice(0,3),character_id:nm?.id||null,character_name:nm?.name||'',name_confidence:nm?.score||0,awakening:aw.value,awakening_confidence:aw.confidence,awakening_source:aw.source,confidence});
+   const aw=awText.value!==null?awText:(await visualAwakening(data)); const starVisual=aw.value===null?await detectStarVisual(data):aw;
+   const visualTop=visual[0]?.score||0; const visualBoost=Math.min(.15,visualTop*.15); const confidence=nm?.score?Math.min(1,(nm.score+visualBoost)*(aw.confidence||.7)):0;
+   out.push({position:i+1,crop:data,ocr:text,candidates:matches.slice(0,3),character_id:nm?.id||null,character_name:nm?.name||'',name_confidence:Math.min(1,(nm?.score||0)+visualBoost),visual_confidence:visualTop,awakening:starVisual.value,awakening_confidence:starVisual.confidence,awakening_source:starVisual.source,confidence});
  }
  return {version:VERSION,party_id:partyId,source_image:src,slots:out,created_at:new Date().toISOString()};
 }
