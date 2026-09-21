@@ -47,12 +47,12 @@ async function ocrText(data){
 function detectStarVisual(data){
  return loadImg(data).then(im=>{
   const w=im.naturalWidth||im.width,h=im.naturalHeight||im.height;
-  const c=document.createElement('canvas'),cw=Math.max(1,Math.round(w*.65)),ch=Math.max(1,Math.round(h*.18));
-  c.width=cw;c.height=ch;c.getContext('2d').drawImage(im,Math.round(w*.18),Math.round(h*.77),cw,ch,0,0,cw,ch);
+  const c=document.createElement('canvas'),cw=Math.max(1,Math.round(w*.70)),ch=Math.max(1,Math.round(h*.22));
+  c.width=cw;c.height=ch;c.getContext('2d').drawImage(im,Math.round(w*.15),Math.round(h*.70),cw,ch,0,0,cw,ch);
   const p=c.getContext('2d').getImageData(0,0,cw,ch).data,bins=[0,0,0,0,0];
   for(let i=0;i<p.length;i+=4){const r=p[i],g=p[i+1],b=p[i+2];if(r>165&&g>140&&b<150&&r+b<g*2.1){const x=((i/4)%cw)/cw;bins[Math.min(4,Math.floor(x*5))]++}}
   const threshold=Math.max(8,cw*ch*.004),active=bins.filter(v=>v>=threshold).length;
-  if(active>=1&&active<=4)return {value:active,confidence:.68,source:'visual_star'};
+  if(active>=1&&active<=4)return {value:active,confidence:.82,source:'visual_star'};
   return {value:null,confidence:0,source:'visual_none'};
  })
 }
@@ -85,7 +85,7 @@ function visualAwakening(data){
 async function analyze(file,partyId){
  const db=await openDB();const chars=await all(db,'characters');const src=await readImage(file);const im=await loadImg(src);
  const w=im.naturalWidth||im.width,h=im.naturalHeight||im.height;
- const landscape=w/h>=1.2;const cols=landscape?3:2,rows=landscape?2:3, gapX=.012,gapY=.012;
+ const wideSix=w/h>=2.2;const landscape=w/h>=1.2;const cols=wideSix?6:(landscape?3:2),rows=wideSix?1:(landscape?2:3),gapX=wideSix?.006:.012,gapY=wideSix?.018:.012;
  const out=[];
  for(let i=0;i<6;i++){
    const col=i%cols,row=Math.floor(i/cols);
