@@ -649,7 +649,12 @@ const C=[
   [
     "本田 美波（神奈川県警の若きエース）",
     "SR"
-  ]
+  ],
+  ["SSR仮登録-37","SSR"],
+  ["Cowdinal（仮登録）","SR"],["Smokey（仮登録）","SR"],["Anna Acid Agent（仮登録）","SR"],["Daichi（仮登録）","SR"],["Erika（仮登録）","SR"],["Jin（仮登録）","SR"],["Meisa（仮登録）","SR"],["Nayu（仮登録）","SR"],["Reika（仮登録）","SR"],["Ryoko（仮登録）","SR"],["Shoko Hungering Gaze（仮登録）","SR"],["Zen（仮登録）","SR"],["Bearberry（仮登録）","SR"],["Bunnlegum（仮登録）","SR"],["Knox（仮登録）","SR"],["Minami（仮登録）","SR"],["Ryu Kendo's Wild Fan（仮登録）","SR"],["Sir Loin（仮登録）","SR"],["Yui Unwavering Light（仮登録）","SR"],
+  ["SR仮登録-01","SR"],["SR仮登録-02","SR"],["SR仮登録-03","SR"],["SR仮登録-04","SR"],["SR仮登録-05","SR"],["SR仮登録-06","SR"],["SR仮登録-07","SR"],["SR仮登録-08","SR"],["SR仮登録-09","SR"],["SR仮登録-10","SR"],["SR仮登録-11","SR"],["SR仮登録-12","SR"],["SR仮登録-13","SR"],["SR仮登録-14","SR"],["SR仮登録-15","SR"],["SR仮登録-16","SR"],["SR仮登録-17","SR"],["SR仮登録-18","SR"],["SR仮登録-19","SR"],["SR仮登録-20","SR"],["SR仮登録-21","SR"],["SR仮登録-22","SR"],
+  ["Aya（仮登録）","R"],["Catnado（仮登録）","R"],["Kenshin（仮登録）","R"],["Mizuno（仮登録）","R"],["Saki（仮登録）","R"],["Seiji（仮登録）","R"],
+  ["R仮登録-01","R"],["R仮登録-02","R"],["R仮登録-03","R"],["R仮登録-04","R"],["R仮登録-05","R"],["R仮登録-06","R"],["R仮登録-07","R"],["R仮登録-08","R"],["R仮登録-09","R"],["R仮登録-10","R"],["R仮登録-11","R"],["R仮登録-12","R"],["R仮登録-13","R"],["R仮登録-14","R"],["R仮登録-15","R"],["R仮登録-16","R"],["R仮登録-17","R"],["R仮登録-18","R"],["R仮登録-19","R"],["R仮登録-20","R"],["R仮登録-21","R"],["R仮登録-22","R"],["R仮登録-23","R"],["R仮登録-24","R"],["R仮登録-25","R"]
 ]
 const DB='paranoise-guildbattle',V=3;
 const open=()=>new Promise((res,rej)=>{const r=indexedDB.open(DB,V);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
