@@ -13,7 +13,7 @@ function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB);r.on
 function all(db,n){return new Promise((res,rej)=>{const r=db.transaction(n).objectStore(n).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 function put(db,n,x){return new Promise((res,rej)=>{const r=db.transaction(n,'readwrite').objectStore(n).put(x);r.onsuccess=()=>res(x);r.onerror=()=>rej(r.error)})}
 function readImage(file){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=()=>rej(fr.error);fr.readAsDataURL(file)})}
-function loadImg(src){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error('画像を読み込めません'));im.src=src})}
+function loadImg(src){return new Promise((res,rej)=>{const im=new Image();let u=null;im.onload=()=>{if(u)URL.revokeObjectURL(u);res(im)};im.onerror=()=>{if(u)URL.revokeObjectURL(u);rej(new Error('画像を読み込めません'))};if(src instanceof Blob){u=URL.createObjectURL(src);im.src=u}else im.src=src})}
 function cropData(im,x,y,w,h){const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w));c.height=Math.max(1,Math.round(h));c.getContext('2d').drawImage(im,x,y,w,h,0,0,w,h);return c.toDataURL('image/jpeg',.88)}
 function levenshtein(a,b){a=norm(a);b=norm(b);if(!a||!b)return 0;const d=Array.from({length:a.length+1},(_,i)=>i);for(let j=1;j<=b.length;j++){let prev=d[0];d[0]=j;for(let i=1;i<=a.length;i++){const old=d[i];d[i]=Math.min(d[i]+1,d[i-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=old}}return 1-d[a.length]/Math.max(a.length,b.length)}
 function imageFeature(data){
