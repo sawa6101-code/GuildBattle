@@ -17,13 +17,19 @@ const lines=t=>String(t).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
 function cleanLine(s){return String(s??'').replace(/^[\s\-・●◆▶•]+/,'').trim()}
 function normalizeRarity(t){
  const x=String(t??'').toUpperCase().replace(/[Ｓｓ]/g,'S').replace(/Ｒ/g,'R').replace(/[\s　・･._-]/g,'');
- if(/SSR|ＳＳＲ/.test(x))return 'SSR';
- if(/(^|[^S])SR|ＳＲ/.test(x))return 'SR';
- if(/(^|[^A-Z])R/.test(x)||/^R+$/.test(x))return 'R';
+ if(/SSR/.test(x))return 'SSR';
+ if(/SR/.test(x))return 'SR';
+ if(/^R+$/.test(x)||/(^|[^A-Z])R$/.test(x))return 'R';
  return '';
 }
 function findRarity(t){return normalizeRarity(t)}
-function findElement(t){const x=String(t);for(const e of ['風','光','闇','火','水','地'])if(new RegExp('(?:属性|エレメント)?\\s*'+e).test(x))return e;return ''}
+function findElement(t){
+ const x=String(t??'');
+ if(/風/.test(x))return '風';
+ if(/光/.test(x))return '光';
+ if(/闇/.test(x))return '闇';
+ return '';
+}
 function findRole(t){const x=String(t);return ['特殊アタッカー','物理アタッカー','ヒーラー','タンク','サポーター','特殊型','アタッカー'].find(k=>x.includes(k))||''}
 function findMaxMP(t){const m=String(t).match(/(?:最大\s*)?MP\s*([0-9]+)/i);return m?Number(m[1]):0}
 function findLevel(t){const m=String(t).match(/Lv\.?\s*([0-9]+)/i);return m?Number(m[1]):0}
@@ -63,17 +69,23 @@ async function ocrRegion(src,psm=7){await ensureOCR();try{const r=await Tesserac
 function cropNorm(im,x,y,w,h){return cropData(im,im.width*x,im.height*y,im.width*w,im.height*h)}
 function detectElementVisual(im){
  const c=document.createElement('canvas'),ctx=c.getContext('2d');
- const x=Math.round(im.width*.265),y=Math.round(im.height*.078),w=Math.round(im.width*.065),h=Math.round(im.height*.060);
+ const x=Math.round(im.width*.16),y=Math.round(im.height*.055),w=Math.round(im.width*.075),h=Math.round(im.height*.060);
  c.width=w;c.height=h;ctx.drawImage(im,x,y,w,h,0,0,w,h);
- const p=ctx.getImageData(0,0,w,h).data;let rS=0,gS=0,bS=0,n=0;
- for(let i=0;i<p.length;i+=4){const r=p[i],g=p[i+1],b=p[i+2],mx=Math.max(r,g,b),mn=Math.min(r,g,b);if(mx-mn>45&&mx>80){rS+=r;gS+=g;bS+=b;n++}}
- if(!n)return '';
- const r=rS/n,g=gS/n,b=bS/n;
- if(g>r*1.15&&g>b*1.12)return '風';
- if(r>g*1.25&&r>b*1.25)return '火';
- if(b>r*1.15&&b>g*1.05)return '水';
- if(r>100&&g>100&&b<100)return '光';
- if(r>g*1.15&&b>g*1.05)return '闇';
+ const p=ctx.getImageData(0,0,w,h).data;let g=0,purp=0,yel=0;
+ for(let i=0;i<p.length;i+=4){
+  const r=p[i],gg=p[i+1],b=p[i+2],mx=Math.max(r,gg,b),mn=Math.min(r,gg,b),d=mx-mn;
+  if(d<30||mx<70)continue;
+  const rr=r/255,gv=gg/255,bb=b/255;
+  const max=mx/255,min=mn/255,delta=max-min;
+  let hue=0;
+  if(delta){if(max===rr)hue=60*(((gv-bb)/delta)%6);else if(max===gv)hue=60*((bb-rr)/delta+2);else hue=60*((rr-gv)/delta+4);if(hue<0)hue+=360}
+  if(hue>=75&&hue<=165)g++;
+  else if(hue>=250&&hue<=330)purp++;
+  else if(hue>=35&&hue<=75&&r>120&&gg>100)yel++;
+ }
+ if(g>=purp&&g>=yel&&g>8)return '風';
+ if(yel>=g&&yel>=purp&&yel>8)return '光';
+ if(purp>=g&&purp>=yel&&purp>8)return '闇';
  return '';
 }
 function cleanNameOCR(t){return lines(t).map(cleanLine).filter(x=>/[一-龯ぁ-んァ-ヶ]/.test(x)).sort((a,b)=>b.length-a.length)[0]||''}
@@ -139,19 +151,21 @@ async function analyze(file){
  const name=nameResult.value;
  const roleText=await ocrRegion(roleCrop,7),mpText=await ocrRegion(mpCrop,7),rarityText=await ocrRegion(rarityCrop,6),skillText=await ocrRegion(skillCrop,6);
  const rarityRaw=await repeatedFieldOCR(rarityCrop,[7,8,6,13]);
- const rarityVotes=rarityRaw.map(normalizeRarity).filter(Boolean);
+ const rarityWhitelistRaw=[];
+ for(const rr of [rarityCrop,...await Promise.all([0,1,2,3].map(m=>preprocessName(rarityCrop,m)))]){await ensureOCR();try{const z=await Tesseract.recognize(rr,'eng',{tessedit_pageseg_mode:7,tessedit_char_whitelist:'SR'});rarityWhitelistRaw.push(z.data?.text||'')}catch{}}
+ const rarityVotes=[...rarityRaw,...rarityWhitelistRaw].map(normalizeRarity).filter(Boolean);
  const rarityCounts=rarityVotes.reduce((m,x)=>(m[x]=(m[x]||0)+1,m),{});
  let rarity=Object.entries(rarityCounts).sort((a,b)=>b[1]-a[1])[0]?.[0]||findRarity(rarityText);
- const role=findRole(roleText),mp=findMaxMP(mpText);
- const element=detectElementVisual(im)||findElement(await ocrRegion(cropNorm(im,.265,.075,.08,.075),6));
+ const role=findRole(roleText),mp=6;
+ const element=detectElementVisual(im)||findElement(await ocrRegion(cropNorm(im,.16,.055,.075,.065),6));
  const skills=parseSkills(skillText);
  const existing=bestExisting(name,title,chars);
  if(existing?.rarity&&['SSR','SR','R'].includes(existing.rarity))rarity=existing.rarity;
  const cardCrop=cropNorm(im,.065,.085,.095,.075,'image/jpeg',.95);
- return {version:'2.2.0',filename:file.name,source_image:src,card_image:cardCrop,name,title,rarity,element,role,max_mp:mp,skills,
+ return {version:'2.2.0',filename:file.name,source_image:src,card_image:cardCrop,name,title,rarity,element,role,max_mp:6,skills,
   name_ocr_confidence:nameResult.confidence,name_ocr_candidates:nameResult.raw,
   header_ocr:[title,name,roleText,mpText,rarityText].join('\n'),
-  rarity_ocr_candidates:rarityRaw,rarity_ocr_votes:rarityVotes,
+  rarity_ocr_candidates:[...rarityRaw,...rarityWhitelistRaw],rarity_ocr_votes:rarityVotes,
   title_ocr_candidates:titleRaw,name_ocr_source:nameResult.source,name_ocr_match_id:nameResult.matched_id||null,skill_ocr:skillText,
   ocr_text:[title,name,roleText,mpText,rarityText,skillText].join('\n'),
   existing_id:existing?.id||null,created_at:new Date().toISOString()};
@@ -181,13 +195,13 @@ async function run(){
 }
 async function confirmSave(r,dup){
  const d=await openDB(),chars=await all(d,'characters'),name=$('#ocrFullName')?.value.trim(),title=$('#ocrFullTitle')?.value.trim()||'';
- if(!name){d.close();return alert('キャラクター名が取得できていません。')}
+ if(!name){d.close();return alert('キャラクター名が取得できていません。')}\n const rarity=normalizeRarity($('#ocrFullRarity')?.value||r.rarity);if(!['SSR','SR','R'].includes(rarity)){d.close();return alert('レアリティをSSR / SR / Rのいずれかに確定してください。')}\n const element=findElement($('#ocrFullElement')?.value||r.element);if(!['闇','風','光'].includes(element)){d.close();return alert('属性を闇 / 風 / 光のいずれかに確定してください。')}
  const existing=bestExisting(name,title,chars)||chars.find(c=>c.id===dup);
  if(existing){d.close();return alert('既存キャラクター候補があります。新規作成は行わず、既存キャラクターの「📷 スクショ登録」で画像・スキルを結び付けてください。\n候補: '+existing.id)}
  let n=1;while(chars.some(c=>c.id==='CHR-'+String(n).padStart(4,'0')))n++;
  const id='CHR-'+String(n).padStart(4,'0'),ts=new Date().toISOString();
  let skills=[];try{skills=JSON.parse($('#ocrFullSkills')?.value||'[]')}catch{skills=r.skills||[]}
- const obj={id,name:title?name+'（'+title+'）':name,base_name:name,title,variant_title:title,rarity:$('#ocrFullRarity')?.value.trim()||'',element:$('#ocrFullElement')?.value.trim()||'',role:$('#ocrFullRole')?.value.trim()||'',max_mp:Number($('#ocrFullMP')?.value)||0,base_hp:r.stats.base_hp||0,base_attack:r.stats.base_attack||0,base_defense:r.stats.base_defense||0,base_speed:r.stats.base_speed||0,skills,skill_data:{skills},battle_profile:{skills},passives:skills.filter(s=>s.type==='passive'),status_effects:[...new Set(skills.flatMap(s=>s.status_effects||[]))],version:1,source:'full_detail_screenshot_ocr',verification_status:'ocr_created_unverified',verification_required:true,screenshot_confirmed:false,observed_level:r.level||0,observed_power:r.power||0,observed_awakening:r.observed_awakening,ocr_source_filename:r.filename,ocr_text:r.ocr_text,created_at:ts,updated_at:ts,active:true};
+ const obj={id,name:title?name+'（'+title+'）':name,base_name:name,title,variant_title:title,rarity:normalizeRarity($('#ocrFullRarity')?.value)||r.rarity||'',element:findElement($('#ocrFullElement')?.value)||r.element||'',role:$('#ocrFullRole')?.value.trim()||'',max_mp:6,base_hp:0,base_attack:0,base_defense:0,base_speed:0,skills,skill_data:{skills},battle_profile:{skills},passives:skills.filter(s=>s.type==='passive'),status_effects:[...new Set(skills.flatMap(s=>s.status_effects||[]))],version:1,source:'full_detail_screenshot_ocr',verification_status:'ocr_created_unverified',verification_required:true,screenshot_confirmed:false,observed_level:r.level||0,observed_power:r.power||0,observed_awakening:r.observed_awakening,ocr_source_filename:r.filename,ocr_text:r.ocr_text,created_at:ts,updated_at:ts,active:true};
  await put(d,'characters',obj);
  if(d.objectStoreNames.contains('characterScreenshots'))await put(d,'characterScreenshots',{id:'cs_'+crypto.randomUUID(),character_id:id,match_status:'CREATED_UNVERIFIED',match_stage:5,match_confidence:.9,filename:r.filename,blob:r.source_image,ocr_text:r.ocr_text,created_at:ts,source:'full_detail_screenshot_ocr'});
  if(d.objectStoreNames.contains('characterImages'))await put(d,'characterImages',{id:'img_'+crypto.randomUUID(),character_id:id,image_type:'card',blob:r.card_image,verified:false,verification_source:'full_detail_screenshot_ocr',created_at:ts});
@@ -195,7 +209,7 @@ async function confirmSave(r,dup){
  d.close();if($('#ocrFullCharacterBox'))$('#ocrFullCharacterBox').classList.add('hidden');if(window.renderCharacters)await window.renderCharacters();if(window.refreshStats)await window.refreshStats();
  alert((title?name+'（'+title+'）':name)+'（'+id+'）を詳細スクショ1枚から登録しました。\n画像・スキル・OCR証拠も保存済み。\n検証状態: 未確認');
 }
-window.ParanoiseOCRNewCharacter={VERSION:'2.0.0',analyze,confirmCreate:confirmSave,installUI};
+window.ParanoiseOCRNewCharacter={VERSION:'2.3.0',analyze,confirmCreate:confirmSave,installUI};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installUI);else installUI();
 new MutationObserver(()=>installUI()).observe(document.body,{childList:true,subtree:true});
 })();
