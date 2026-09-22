@@ -52,14 +52,49 @@ function bestExisting(name,title,chars){
  return chars.find(c=>norm(c.name)===combo||norm(c.name)===norm(name)||((norm(c.base_name||'')===norm(name))&&(title?norm(c.title||c.variant_title||'')===norm(title):true)))||null;
 }
 function featureVector(src){return loadImg(src).then(im=>{const c=document.createElement('canvas');c.width=c.height=16;c.getContext('2d').drawImage(im,0,0,16,16);const p=c.getContext('2d').getImageData(0,0,16,16).data,v=[];for(let i=0;i<p.length;i+=4)v.push(Math.round(p[i]/32),Math.round(p[i+1]/32),Math.round(p[i+2]/32));return v})}
+async function ocrRegion(src,psm=7){await ensureOCR();try{const r=await Tesseract.recognize(src,'jpn+eng',{tessedit_pageseg_mode:psm});return r.data?.text||''}catch{return ''}}
+function cropNorm(im,x,y,w,h){return cropData(im,im.width*x,im.height*y,im.width*w,im.height*h)}
+function detectElementVisual(im){
+ const c=document.createElement('canvas'),ctx=c.getContext('2d');
+ const x=Math.round(im.width*.165),y=Math.round(im.height*.052),w=Math.round(im.width*.075),h=Math.round(im.height*.075);
+ c.width=w;c.height=h;ctx.drawImage(im,x,y,w,h,0,0,w,h);
+ const p=ctx.getImageData(0,0,w,h).data;let rS=0,gS=0,bS=0,n=0;
+ for(let i=0;i<p.length;i+=4){const r=p[i],g=p[i+1],b=p[i+2],mx=Math.max(r,g,b),mn=Math.min(r,g,b);if(mx-mn>45&&mx>80){rS+=r;gS+=g;bS+=b;n++}}
+ if(!n)return '';
+ const r=rS/n,g=gS/n,b=bS/n;
+ if(g>r*1.15&&g>b*1.12)return '風';
+ if(r>g*1.25&&r>b*1.25)return '火';
+ if(b>r*1.15&&b>g*1.05)return '水';
+ if(r>100&&g>100&&b<100)return '光';
+ if(r>g*1.15&&b>g*1.05)return '闇';
+ return '';
+}
+function cleanNameOCR(t){return lines(t).map(cleanLine).filter(x=>/[一-龯ぁ-んァ-ヶ]/.test(x)).sort((a,b)=>b.length-a.length)[0]||''}
 async function analyze(file){
  const db=await openDB(),chars=await all(db,'characters');db.close();
- const src=await fileData(file),im=await loadImg(src),w=im.naturalWidth||im.width,h=im.naturalHeight||im.height;
- const headerCrop=cropData(im,w*.27,h*.06,w*.60,h*.20),skillCrop=cropData(im,w*.07,h*.18,w*.86,h*.72);
- const fullText=await ocr(src),headerText=await ocr(headerCrop),skillText=await ocr(skillCrop),combined=[fullText,headerText,skillText].join('\n');
- const info=splitNameTitle(headerText+'\n'+fullText,chars),rarity=findRarity(combined),element=findElement(combined),role=findRole(combined),maxMp=findMaxMP(combined),level=findLevel(headerText),power=findPower(headerText),stats=parseStats(combined),skills=parseSkills(skillText+'\n'+fullText),awakening=parseStars(skillText);
- const cardCrop=cropData(im,w*.09,h*.085,w*.18,h*.125,'image/jpeg',.92),existing=bestExisting(info.name,info.title,chars);
- return {version:'2.0.0',filename:file.name,source_image:src,card_image:cardCrop,ocr_text:combined,header_ocr:headerText,skill_ocr:skillText,name:info.name,title:info.title,full_name:info.title?info.name+'（'+info.title+'）':info.name,rarity,element,role,max_mp:maxMp,level,power,stats,skills,observed_awakening:awakening,existing_id:existing?.id||null,created_at:new Date().toISOString()}
+ const src=await fileData(file),im=await loadImg(src);
+ // 1320x2868実画面を基準に、項目ごとに専用OCR領域を設定
+ const titleCrop=cropNorm(im,.205,.052,.30,.035);
+ const nameCrop=cropNorm(im,.205,.075,.30,.040);
+ const roleCrop=cropNorm(im,.205,.105,.36,.045);
+ const mpCrop=cropNorm(im,.32,.145,.25,.040);
+ const rarityCrop=cropNorm(im,.065,.052,.095,.075);
+ const skillCrop=cropNorm(im,.065,.125,.88,.430);
+ const title=cleanNameOCR(await ocrRegion(titleCrop,7));
+ const name=cleanNameOCR(await ocrRegion(nameCrop,7));
+ const roleText=await ocrRegion(roleCrop,7);
+ const mpText=await ocrRegion(mpCrop,7);
+ const rarityText=await ocrRegion(rarityCrop,6);
+ const skillText=await ocrRegion(skillCrop,6);
+ const role=findRole(roleText),mp=findMaxMP(mpText),rarity=findRarity(rarityText);
+ const element=detectElementVisual(im)||findElement(await ocrRegion(cropNorm(im,.155,.045,.10,.095),6));
+ const skills=parseSkills(skillText);
+ const existing=bestExisting(name,title,chars);
+ const cardCrop=cropNorm(im,.065,.052,.095,.075,'image/jpeg',.95);
+ return {version:'2.1.0',filename:file.name,source_image:src,card_image:cardCrop,name,title,rarity,element,role,max_mp:mp,skills,
+  header_ocr:[title,name,roleText,mpText,rarityText].join('\n'),skill_ocr:skillText,
+  ocr_text:[title,name,roleText,mpText,rarityText,skillText].join('\n'),
+  existing_id:existing?.id||null,created_at:new Date().toISOString()};
 }
 function installUI(){
  const head=document.querySelector('#characters .section-head');if(!head)return;
@@ -75,10 +110,10 @@ async function run(){
  try{
   const r=await analyze(f);window.__ocrFullCharacterLast=r;const dup=r.existing_id;
   st.textContent=dup?'⚠️ 既存候補が見つかりました。':'🟡 OCRから新規登録候補を作成しました。';
-  pv.innerHTML='<div class="notice"><b>キャラ名:</b> '+esc(r.name||'未検出')+'<br><b>種別:</b> '+esc(r.title||'未検出')+'<br><b>統合名:</b> '+esc(r.full_name||'')+'<br><b>レアリティ:</b> '+esc(r.rarity||'未検出')+' / <b>属性:</b> '+esc(r.element||'未検出')+' / <b>役割:</b> '+esc(r.role||'未検出')+'<br><b>最大MP:</b> '+(r.max_mp||'未検出')+' / <b>Lv:</b> '+(r.level||'未検出')+' / <b>戦力:</b> '+(r.power?r.power.toLocaleString():'未検出')+'<br><b>画面上の★:</b> '+(r.observed_awakening===null?'未検出':'★'+r.observed_awakening+'（観測値）')+'</div>'+
+  pv.innerHTML='<div class="notice"><b>キャラ名:</b> '+esc(r.name||'未検出')+'<br><b>種別:</b> '+esc(r.title||'未検出')+'<br><b>レアリティ:</b> '+esc(r.rarity||'未検出')+' / <b>属性:</b> '+esc(r.element||'未検出')+' / <b>役割:</b> '+esc(r.role||'未検出')+'<br><b>最大MP:</b> '+(r.max_mp||'未検出')+'</div>'+
   '<div class="meta-grid"><label>自動発行ID<input id="ocrFullId" readonly></label><label>キャラ名<input id="ocrFullName" value="'+esc(r.name)+'"></label><label>種別（タイトル）<input id="ocrFullTitle" value="'+esc(r.title)+'"></label><label>レアリティ<input id="ocrFullRarity" value="'+esc(r.rarity)+'"></label><label>属性<input id="ocrFullElement" value="'+esc(r.element)+'"></label><label>役割<input id="ocrFullRole" value="'+esc(r.role)+'"></label><label>最大MP<input id="ocrFullMP" type="number" value="'+(r.max_mp||0)+'"></label></div>'+
   '<label>スキル解析結果<textarea id="ocrFullSkills" rows="12">'+esc(JSON.stringify(r.skills,null,2))+'</textarea></label>'+
-  '<label>OCR全文<textarea id="ocrFullRaw" rows="8">'+esc(r.ocr_text)+'</textarea></label>'+
+  '<label>OCR全文（項目別領域）<textarea id="ocrFullRaw" rows="8">'+esc(r.ocr_text)+'</textarea></label>'+
   '<div class="notice">'+(dup?('⚠️ 既存候補: '+esc(dup)+'。既存キャラなら新規作成ではなくスクショ結び付けを使用します。'):'保存時に空いているCHR-IDを自動採番します。')+'</div>'+
   '<button type="button" class="wide primary" id="ocrFullConfirm">✅ 内容を確認して登録</button>';
   $('#ocrFullId').value=dup||'保存時自動採番';$('#ocrFullConfirm').onclick=()=>confirmSave(r,dup);
