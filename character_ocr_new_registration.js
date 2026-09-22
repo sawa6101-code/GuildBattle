@@ -72,15 +72,47 @@ function detectElementVisual(im){
 function cleanNameOCR(t){return lines(t).map(cleanLine).filter(x=>/[一-龯ぁ-んァ-ヶ]/.test(x)).sort((a,b)=>b.length-a.length)[0]||''}
 function levenshtein(a,b){a=norm(a);b=norm(b);const m=a.length,n=b.length,d=Array.from({length:m+1},()=>Array(n+1).fill(0));for(let i=0;i<=m;i++)d[i][0]=i;for(let j=0;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n]}
 function preprocessName(src,mode){return loadImg(src).then(im=>{const c=document.createElement('canvas'),ctx=c.getContext('2d');c.width=im.width*3;c.height=im.height*3;ctx.drawImage(im,0,0,c.width,c.height);const img=ctx.getImageData(0,0,c.width,c.height),p=img.data;for(let i=0;i<p.length;i+=4){const y=.299*p[i]+.587*p[i+1]+.114*p[i+2];let v=y;if(mode===1)v=Math.max(0,Math.min(255,(y-128)*2+128));if(mode===2)v=y>150?255:0;if(mode===3)v=y>125?255:0;p[i]=p[i+1]=p[i+2]=v}ctx.putImageData(img,0,0);return c.toDataURL('image/png')})}
-async function repeatedNameOCR(crop,chars){
+function fuzzyBest(value,list){
+ const v=norm(value);if(!v)return {item:null,ratio:1};
+ let best=null,ratio=1;
+ for(const item of list){const x=norm(item);if(!x)continue;const r=levenshtein(v,x)/Math.max(1,v.length,x.length);if(r<ratio){ratio=r;best=item}}
+ return {item:best,ratio};
+}
+async function repeatedFieldOCR(crop,psms=[7,6,13]){
  const variants=[crop,...await Promise.all([0,1,2,3].map(m=>preprocessName(crop,m)))];
  const raw=[];
- for(const src of variants){for(const psm of [7,6,13]){const t=await ocrRegion(src,psm);const x=cleanNameOCR(t);if(x)raw.push(x)}}
+ for(const src of variants)for(const psm of psms){const t=await ocrRegion(src,psm);for(const x of lines(t).map(cleanLine).filter(Boolean))raw.push(x)}
+ return [...new Set(raw)];
+}
+async function repeatedNameOCR(crop,chars,title){
+ const raw=await repeatedFieldOCR(crop);
  const candidates=[...new Set(chars.map(c=>c.base_name||String(c.name||'').replace(/（.*$/,'')).filter(Boolean))];
- let best='',score=1e9;
- for(const x of raw){for(const n of candidates){const d=levenshtein(x,n);const ratio=d/Math.max(1,Math.max(norm(x).length,norm(n).length));if(ratio<score){score=ratio;best=n}}}
- if(best&&score<=.55)return {value:best,confidence:Math.max(.5,1-score),raw};
- return {value:raw.sort((a,b)=>b.length-a.length)[0]||'',confidence:.3,raw}
+ // OCR単独では誤読しやすいため、同一タイトルを持つマスターを最優先する
+ if(title){
+   const titleNorm=norm(title);
+   const exact=chars.filter(c=>norm(c.title||c.variant_title||'')===titleNorm);
+   if(exact.length===1){
+     const n=exact[0].base_name||String(exact[0].name||'').replace(/（.*$/,'');
+     return {value:n,confidence:.99,raw,source:'title_exact',matched_id:exact[0].id};
+   }
+   const tf=fuzzyBest(title,chars.map(c=>c.title||c.variant_title||'').filter(Boolean));
+   if(tf.item&&tf.ratio<=.28){
+     const hits=chars.filter(c=>norm(c.title||c.variant_title||'')===norm(tf.item));
+     if(hits.length===1){
+       const n=hits[0].base_name||String(hits[0].name||'').replace(/（.*$/,'');
+       return {value:n,confidence:Math.max(.88,1-tf.ratio),raw,source:'title_fuzzy',matched_id:hits[0].id};
+     }
+   }
+ }
+ // タイトルで決まらない場合だけ、複数OCR結果をマスター名へ投票照合
+ let best='',score=1e9,hits=0;
+ for(const x of raw){
+   const fb=fuzzyBest(x,candidates);
+   if(fb.item&&fb.ratio<score){score=fb.ratio;best=fb.item;hits=1}
+   else if(fb.item&&fb.item===best)hits++;
+ }
+ if(best&&score<=.45)return {value:best,confidence:Math.max(.55,1-score),raw,source:'name_fuzzy',hits};
+ return {value:'',confidence:0,raw,source:'unresolved'};
 }
 async function analyze(file){
  const db=await openDB(),chars=await all(db,'characters');db.close();
@@ -91,8 +123,12 @@ async function analyze(file){
  const mpCrop=cropNorm(im,.335,.160,.30,.040);
  const rarityCrop=cropNorm(im,.065,.085,.095,.055);
  const skillCrop=cropNorm(im,.065,.125,.88,.430);
- const title=cleanNameOCR(await ocrRegion(titleCrop,7));
- const nameResult=await repeatedNameOCR(nameCrop,chars);
+ const titleRaw=await repeatedFieldOCR(titleCrop,[7,6,13]);
+ const titleCandidates=chars.map(c=>c.title||c.variant_title||'').filter(Boolean);
+ const titleExact=titleRaw.find(x=>titleCandidates.some(t=>norm(t)===norm(x)))||'';
+ const titleFuzzy=fuzzyBest(titleRaw[0]||'',titleCandidates);
+ const title=titleExact||(titleFuzzy.item&&titleFuzzy.ratio<=.35?titleFuzzy.item:cleanNameOCR(titleRaw.join('\n')));
+ const nameResult=await repeatedNameOCR(nameCrop,chars,title);
  const name=nameResult.value;
  const roleText=await ocrRegion(roleCrop,7),mpText=await ocrRegion(mpCrop,7),rarityText=await ocrRegion(rarityCrop,6),skillText=await ocrRegion(skillCrop,6);
  const role=findRole(roleText),mp=findMaxMP(mpText),rarity=findRarity(rarityText);
@@ -102,7 +138,8 @@ async function analyze(file){
  const cardCrop=cropNorm(im,.065,.085,.095,.075,'image/jpeg',.95);
  return {version:'2.2.0',filename:file.name,source_image:src,card_image:cardCrop,name,title,rarity,element,role,max_mp:mp,skills,
   name_ocr_confidence:nameResult.confidence,name_ocr_candidates:nameResult.raw,
-  header_ocr:[title,name,roleText,mpText,rarityText].join('\n'),skill_ocr:skillText,
+  header_ocr:[title,name,roleText,mpText,rarityText].join('\n'),
+  title_ocr_candidates:titleRaw,name_ocr_source:nameResult.source,name_ocr_match_id:nameResult.matched_id||null,skill_ocr:skillText,
   ocr_text:[title,name,roleText,mpText,rarityText,skillText].join('\n'),
   existing_id:existing?.id||null,created_at:new Date().toISOString()};
 }
