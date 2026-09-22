@@ -70,10 +70,21 @@ function detectElementVisual(im){
  return '';
 }
 function cleanNameOCR(t){return lines(t).map(cleanLine).filter(x=>/[一-龯ぁ-んァ-ヶ]/.test(x)).sort((a,b)=>b.length-a.length)[0]||''}
+function levenshtein(a,b){a=norm(a);b=norm(b);const m=a.length,n=b.length,d=Array.from({length:m+1},()=>Array(n+1).fill(0));for(let i=0;i<=m;i++)d[i][0]=i;for(let j=0;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n]}
+function preprocessName(src,mode){return loadImg(src).then(im=>{const c=document.createElement('canvas'),ctx=c.getContext('2d');c.width=im.width*3;c.height=im.height*3;ctx.drawImage(im,0,0,c.width,c.height);const img=ctx.getImageData(0,0,c.width,c.height),p=img.data;for(let i=0;i<p.length;i+=4){const y=.299*p[i]+.587*p[i+1]+.114*p[i+2];let v=y;if(mode===1)v=Math.max(0,Math.min(255,(y-128)*2+128));if(mode===2)v=y>150?255:0;if(mode===3)v=y>125?255:0;p[i]=p[i+1]=p[i+2]=v}ctx.putImageData(img,0,0);return c.toDataURL('image/png')})}
+async function repeatedNameOCR(crop,chars){
+ const variants=[crop,...await Promise.all([0,1,2,3].map(m=>preprocessName(crop,m)))];
+ const raw=[];
+ for(const src of variants){for(const psm of [7,6,13]){const t=await ocrRegion(src,psm);const x=cleanNameOCR(t);if(x)raw.push(x)}}
+ const candidates=[...new Set(chars.map(c=>c.base_name||String(c.name||'').replace(/（.*$/,'')).filter(Boolean))];
+ let best='',score=1e9;
+ for(const x of raw){for(const n of candidates){const d=levenshtein(x,n);const ratio=d/Math.max(1,Math.max(norm(x).length,norm(n).length));if(ratio<score){score=ratio;best=n}}}
+ if(best&&score<=.55)return {value:best,confidence:Math.max(.5,1-score),raw};
+ return {value:raw.sort((a,b)=>b.length-a.length)[0]||'',confidence:.3,raw}
+}
 async function analyze(file){
  const db=await openDB(),chars=await all(db,'characters');db.close();
  const src=await fileData(file),im=await loadImg(src);
- // 1320x2868実画面を基準に、項目ごとに専用OCR領域を設定
  const titleCrop=cropNorm(im,.335,.087,.30,.035);
  const nameCrop=cropNorm(im,.335,.103,.30,.042);
  const roleCrop=cropNorm(im,.335,.127,.38,.045);
@@ -81,17 +92,16 @@ async function analyze(file){
  const rarityCrop=cropNorm(im,.065,.085,.095,.055);
  const skillCrop=cropNorm(im,.065,.125,.88,.430);
  const title=cleanNameOCR(await ocrRegion(titleCrop,7));
- const name=cleanNameOCR(await ocrRegion(nameCrop,7));
- const roleText=await ocrRegion(roleCrop,7);
- const mpText=await ocrRegion(mpCrop,7);
- const rarityText=await ocrRegion(rarityCrop,6);
- const skillText=await ocrRegion(skillCrop,6);
+ const nameResult=await repeatedNameOCR(nameCrop,chars);
+ const name=nameResult.value;
+ const roleText=await ocrRegion(roleCrop,7),mpText=await ocrRegion(mpCrop,7),rarityText=await ocrRegion(rarityCrop,6),skillText=await ocrRegion(skillCrop,6);
  const role=findRole(roleText),mp=findMaxMP(mpText),rarity=findRarity(rarityText);
  const element=detectElementVisual(im)||findElement(await ocrRegion(cropNorm(im,.265,.075,.08,.075),6));
  const skills=parseSkills(skillText);
  const existing=bestExisting(name,title,chars);
  const cardCrop=cropNorm(im,.065,.085,.095,.075,'image/jpeg',.95);
- return {version:'2.1.0',filename:file.name,source_image:src,card_image:cardCrop,name,title,rarity,element,role,max_mp:mp,skills,
+ return {version:'2.2.0',filename:file.name,source_image:src,card_image:cardCrop,name,title,rarity,element,role,max_mp:mp,skills,
+  name_ocr_confidence:nameResult.confidence,name_ocr_candidates:nameResult.raw,
   header_ocr:[title,name,roleText,mpText,rarityText].join('\n'),skill_ocr:skillText,
   ocr_text:[title,name,roleText,mpText,rarityText,skillText].join('\n'),
   existing_id:existing?.id||null,created_at:new Date().toISOString()};
@@ -110,7 +120,7 @@ async function run(){
  try{
   const r=await analyze(f);window.__ocrFullCharacterLast=r;const dup=r.existing_id;
   st.textContent=dup?'⚠️ 既存候補が見つかりました。':'🟡 OCRから新規登録候補を作成しました。';
-  pv.innerHTML='<div class="notice"><b>キャラ名:</b> '+esc(r.name||'未検出')+'<br><b>種別:</b> '+esc(r.title||'未検出')+'<br><b>レアリティ:</b> '+esc(r.rarity||'未検出')+' / <b>属性:</b> '+esc(r.element||'未検出')+' / <b>役割:</b> '+esc(r.role||'未検出')+'<br><b>最大MP:</b> '+(r.max_mp||'未検出')+'</div>'+
+  pv.innerHTML='<div class="notice"><b>キャラ名:</b> '+esc(r.name||'未検出')+'<br><b>OCR照合:</b> '+Math.round((r.name_ocr_confidence||0)*100)+'%<br><b>統合名:</b> '+esc(r.name+(r.title?'（'+r.title+'）':''))+'<br><b>種別:</b> '+esc(r.title||'未検出')+'<br><b>レアリティ:</b> '+esc(r.rarity||'未検出')+' / <b>属性:</b> '+esc(r.element||'未検出')+' / <b>役割:</b> '+esc(r.role||'未検出')+'<br><b>最大MP:</b> '+(r.max_mp||'未検出')+'</div>'+
   '<div class="meta-grid"><label>自動発行ID<input id="ocrFullId" readonly></label><label>キャラ名<input id="ocrFullName" value="'+esc(r.name)+'"></label><label>種別（タイトル）<input id="ocrFullTitle" value="'+esc(r.title)+'"></label><label>レアリティ<input id="ocrFullRarity" value="'+esc(r.rarity)+'"></label><label>属性<input id="ocrFullElement" value="'+esc(r.element)+'"></label><label>役割<input id="ocrFullRole" value="'+esc(r.role)+'"></label><label>最大MP<input id="ocrFullMP" type="number" value="'+(r.max_mp||0)+'"></label></div>'+
   '<label>スキル解析結果<textarea id="ocrFullSkills" rows="12">'+esc(JSON.stringify(r.skills,null,2))+'</textarea></label>'+
   '<label>OCR全文（項目別領域）<textarea id="ocrFullRaw" rows="8">'+esc(r.ocr_text)+'</textarea></label>'+
