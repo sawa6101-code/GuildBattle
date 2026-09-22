@@ -175,7 +175,7 @@ function installUI(){
  if($('#ocrFullCharacterButton'))return;
  const b=document.createElement('button');b.type='button';b.className='small';b.id='ocrFullCharacterButton';b.textContent='📷 1枚から全情報登録';head.appendChild(b);
  const box=document.createElement('div');box.id='ocrFullCharacterBox';box.className='card hidden';
- box.innerHTML='<h3>📷 詳細スクショ1枚からキャラクターDB登録</h3><p class="hint">上部からキャラ名・種別・属性・役割・最大MP・レベル・戦力、下部からパッシブ／アクティブスキルを抽出します。キャラ画像も画像マスターへ保存します。</p><label class="upload"><input id="ocrFullCharacterFile" type="file" accept="image/*">キャラクター詳細スクショ</label><button type="button" class="wide primary" id="ocrFullCharacterAnalyze">🔍 1枚を解析</button><div id="ocrFullCharacterStatus" class="hint"></div><div id="ocrFullCharacterPreview"></div>';
+ box.innerHTML='<h3>📷 詳細スクショ1枚からキャラクターDB登録</h3><p class="hint">上部からキャラ名・種別・レアリティ・属性・役割・最大MP、下部からパッシブ／アクティブスキルを抽出します。キャラ画像も画像マスターへ保存します。</p><label class="upload"><input id="ocrFullCharacterFile" type="file" accept="image/*">キャラクター詳細スクショ</label><button type="button" class="wide primary" id="ocrFullCharacterAnalyze">🔍 1枚を解析</button><div id="ocrFullCharacterStatus" class="hint"></div><div id="ocrFullCharacterPreview"></div>';
  $('#characters').insertBefore(box,$('#characterForm'));b.onclick=()=>{box.classList.toggle('hidden');if(!box.classList.contains('hidden'))box.scrollIntoView({behavior:'smooth',block:'start'})};$('#ocrFullCharacterAnalyze').onclick=run;
 }
 async function run(){
@@ -194,20 +194,28 @@ async function run(){
  }catch(e){console.error(e);st.textContent='解析エラー: '+(e?.message||String(e))}
 }
 async function confirmSave(r,dup){
- const d=await openDB(),chars=await all(d,'characters'),name=$('#ocrFullName')?.value.trim(),title=$('#ocrFullTitle')?.value.trim()||'';
- if(!name){d.close();return alert('キャラクター名が取得できていません。')}\n const rarity=normalizeRarity($('#ocrFullRarity')?.value||r.rarity);if(!['SSR','SR','R'].includes(rarity)){d.close();return alert('レアリティをSSR / SR / Rのいずれかに確定してください。')}\n const element=findElement($('#ocrFullElement')?.value||r.element);if(!['闇','風','光'].includes(element)){d.close();return alert('属性を闇 / 風 / 光のいずれかに確定してください。')}
+ const d=await openDB(),chars=await all(d,'characters');
+ const name=$('#ocrFullName')?.value.trim(),title=$('#ocrFullTitle')?.value.trim()||'';
+ if(!name){d.close();return alert('キャラクター名が取得できていません。')}
+ const rarity=normalizeRarity($('#ocrFullRarity')?.value||r.rarity);
+ if(!['SSR','SR','R'].includes(rarity)){d.close();return alert('レアリティをSSR / SR / Rのいずれかに確定してください。')}
+ const element=findElement($('#ocrFullElement')?.value||r.element);
+ if(!['闇','風','光'].includes(element)){d.close();return alert('属性を闇 / 風 / 光のいずれかに確定してください。')}
  const existing=bestExisting(name,title,chars)||chars.find(c=>c.id===dup);
- if(existing){d.close();return alert('既存キャラクター候補があります。新規作成は行わず、既存キャラクターの「📷 スクショ登録」で画像・スキルを結び付けてください。\n候補: '+existing.id)}
+ if(existing){d.close();return alert('既存キャラクター候補があります。新規作成は行わず、既存キャラクターの「📷 スクショ登録」で画像・スキルを結び付けてください。\\n候補: '+existing.id)}
  let n=1;while(chars.some(c=>c.id==='CHR-'+String(n).padStart(4,'0')))n++;
  const id='CHR-'+String(n).padStart(4,'0'),ts=new Date().toISOString();
  let skills=[];try{skills=JSON.parse($('#ocrFullSkills')?.value||'[]')}catch{skills=r.skills||[]}
- const obj={id,name:title?name+'（'+title+'）':name,base_name:name,title,variant_title:title,rarity:normalizeRarity($('#ocrFullRarity')?.value)||r.rarity||'',element:findElement($('#ocrFullElement')?.value)||r.element||'',role:$('#ocrFullRole')?.value.trim()||'',max_mp:6,base_hp:0,base_attack:0,base_defense:0,base_speed:0,skills,skill_data:{skills},battle_profile:{skills},passives:skills.filter(s=>s.type==='passive'),status_effects:[...new Set(skills.flatMap(s=>s.status_effects||[]))],version:1,source:'full_detail_screenshot_ocr',verification_status:'ocr_created_unverified',verification_required:true,screenshot_confirmed:false,observed_level:r.level||0,observed_power:r.power||0,observed_awakening:r.observed_awakening,ocr_source_filename:r.filename,ocr_text:r.ocr_text,created_at:ts,updated_at:ts,active:true};
+ const obj={id,name:title?name+'（'+title+'）':name,base_name:name,title,variant_title:title,rarity,element,role:$('#ocrFullRole')?.value.trim()||r.role||'',max_mp:6,base_hp:0,base_attack:0,base_defense:0,base_speed:0,skills,skill_data:{skills},battle_profile:{skills},passives:skills.filter(s=>s.type==='passive'),status_effects:[...new Set(skills.flatMap(s=>s.status_effects||[]))],version:1,source:'full_detail_screenshot_ocr',verification_status:'ocr_created_unverified',verification_required:true,screenshot_confirmed:false,ocr_source_filename:r.filename,ocr_text:r.ocr_text,created_at:ts,updated_at:ts,active:true};
  await put(d,'characters',obj);
- if(d.objectStoreNames.contains('characterScreenshots'))await put(d,'characterScreenshots',{id:'cs_'+crypto.randomUUID(),character_id:id,match_status:'CREATED_UNVERIFIED',match_stage:5,match_confidence:.9,filename:r.filename,blob:r.source_image,ocr_text:r.ocr_text,created_at:ts,source:'full_detail_screenshot_ocr'});
+ if(d.objectStoreNames.contains('characterScreenshots'))await put(d,'characterScreenshots',{id:'cs_'+crypto.randomUUID(),character_id:id,match_status:'CREATED_UNVERIFIED',match_stage:5,match_confidence:r.name_ocr_confidence||.9,filename:r.filename,blob:r.source_image,ocr_text:r.ocr_text,created_at:ts,source:'full_detail_screenshot_ocr'});
  if(d.objectStoreNames.contains('characterImages'))await put(d,'characterImages',{id:'img_'+crypto.randomUUID(),character_id:id,image_type:'card',blob:r.card_image,verified:false,verification_source:'full_detail_screenshot_ocr',created_at:ts});
  if(d.objectStoreNames.contains('characterSkillSources'))await put(d,'characterSkillSources',{id:'skill_'+crypto.randomUUID(),character_id:id,source:'full_detail_screenshot_ocr',filename:r.filename,ocr_text:r.skill_ocr,skills,created_at:ts});
- d.close();if($('#ocrFullCharacterBox'))$('#ocrFullCharacterBox').classList.add('hidden');if(window.renderCharacters)await window.renderCharacters();if(window.refreshStats)await window.refreshStats();
- alert((title?name+'（'+title+'）':name)+'（'+id+'）を詳細スクショ1枚から登録しました。\n画像・スキル・OCR証拠も保存済み。\n検証状態: 未確認');
+ d.close();
+ if($('#ocrFullCharacterBox'))$('#ocrFullCharacterBox').classList.add('hidden');
+ if(window.renderCharacters)await window.renderCharacters();
+ if(window.refreshStats)await window.refreshStats();
+ alert((title?name+'（'+title+'）':name)+'（'+id+'）を詳細スクショ1枚から登録しました。\\n画像・スキル・OCR証拠も保存済み。\\n検証状態: 未確認');
 }
 window.ParanoiseOCRNewCharacter={VERSION:'2.3.0',analyze,confirmCreate:confirmSave,installUI};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installUI);else installUI();
