@@ -56,7 +56,7 @@ async function ocrRegion(src,psm=7){await ensureOCR();try{const r=await Tesserac
 function cropNorm(im,x,y,w,h){return cropData(im,im.width*x,im.height*y,im.width*w,im.height*h)}
 function detectElementVisual(im){
  const c=document.createElement('canvas'),ctx=c.getContext('2d');
- const x=Math.round(im.width*.165),y=Math.round(im.height*.052),w=Math.round(im.width*.075),h=Math.round(im.height*.075);
+ const x=Math.round(im.width*.265),y=Math.round(im.height*.078),w=Math.round(im.width*.065),h=Math.round(im.height*.060);
  c.width=w;c.height=h;ctx.drawImage(im,x,y,w,h,0,0,w,h);
  const p=ctx.getImageData(0,0,w,h).data;let rS=0,gS=0,bS=0,n=0;
  for(let i=0;i<p.length;i+=4){const r=p[i],g=p[i+1],b=p[i+2],mx=Math.max(r,g,b),mn=Math.min(r,g,b);if(mx-mn>45&&mx>80){rS+=r;gS+=g;bS+=b;n++}}
@@ -74,11 +74,11 @@ async function analyze(file){
  const db=await openDB(),chars=await all(db,'characters');db.close();
  const src=await fileData(file),im=await loadImg(src);
  // 1320x2868実画面を基準に、項目ごとに専用OCR領域を設定
- const titleCrop=cropNorm(im,.205,.052,.30,.035);
- const nameCrop=cropNorm(im,.205,.075,.30,.040);
- const roleCrop=cropNorm(im,.205,.105,.36,.045);
- const mpCrop=cropNorm(im,.32,.145,.25,.040);
- const rarityCrop=cropNorm(im,.065,.052,.095,.075);
+ const titleCrop=cropNorm(im,.335,.087,.30,.035);
+ const nameCrop=cropNorm(im,.335,.103,.30,.042);
+ const roleCrop=cropNorm(im,.335,.127,.38,.045);
+ const mpCrop=cropNorm(im,.335,.160,.30,.040);
+ const rarityCrop=cropNorm(im,.065,.085,.095,.055);
  const skillCrop=cropNorm(im,.065,.125,.88,.430);
  const title=cleanNameOCR(await ocrRegion(titleCrop,7));
  const name=cleanNameOCR(await ocrRegion(nameCrop,7));
@@ -87,10 +87,10 @@ async function analyze(file){
  const rarityText=await ocrRegion(rarityCrop,6);
  const skillText=await ocrRegion(skillCrop,6);
  const role=findRole(roleText),mp=findMaxMP(mpText),rarity=findRarity(rarityText);
- const element=detectElementVisual(im)||findElement(await ocrRegion(cropNorm(im,.155,.045,.10,.095),6));
+ const element=detectElementVisual(im)||findElement(await ocrRegion(cropNorm(im,.265,.075,.08,.075),6));
  const skills=parseSkills(skillText);
  const existing=bestExisting(name,title,chars);
- const cardCrop=cropNorm(im,.065,.052,.095,.075,'image/jpeg',.95);
+ const cardCrop=cropNorm(im,.065,.085,.095,.075,'image/jpeg',.95);
  return {version:'2.1.0',filename:file.name,source_image:src,card_image:cardCrop,name,title,rarity,element,role,max_mp:mp,skills,
   header_ocr:[title,name,roleText,mpText,rarityText].join('\n'),skill_ocr:skillText,
   ocr_text:[title,name,roleText,mpText,rarityText,skillText].join('\n'),
