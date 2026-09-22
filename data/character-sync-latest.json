@@ -1,9 +1,14 @@
 {
   "version": 1,
-  "generated_at": "2026-09-22T04:50:58.280406+00:00",
+  "generated_at": "2026-09-22T11:33:51.423302+00:00",
   "count": 0,
   "records": [],
-  "errors": [],
+  "errors": [
+    {
+      "source": "paranavi-performance",
+      "error": "503 Server Error: Service Temporarily Unavailable for url: https://www.gaming.kyuzitu.net/paranoizu/category/character-seinou-hyouka/"
+    }
+  ],
   "source_priority": [
     "game_server",
     "public_api",
