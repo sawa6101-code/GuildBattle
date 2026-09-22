@@ -15,7 +15,14 @@ async function ensureOCR(){if(window.Tesseract)return;const s=document.createEle
 async function ocr(src){await ensureOCR();try{const r=await Tesseract.recognize(src,'jpn+eng');return r.data?.text||''}catch{return ''}}
 const lines=t=>String(t).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
 function cleanLine(s){return String(s??'').replace(/^[\s\-・●◆▶•]+/,'').trim()}
-function findRarity(t){const x=String(t).toUpperCase().replace(/ＳＳＲ/g,'SSR').replace(/ＳＲ/g,'SR');return x.match(/\b(SSR|SR|R)\b/)?.[1]||''}
+function normalizeRarity(t){
+ const x=String(t??'').toUpperCase().replace(/[Ｓｓ]/g,'S').replace(/Ｒ/g,'R').replace(/[\s　・･._-]/g,'');
+ if(/SSR|ＳＳＲ/.test(x))return 'SSR';
+ if(/(^|[^S])SR|ＳＲ/.test(x))return 'SR';
+ if(/(^|[^A-Z])R/.test(x)||/^R+$/.test(x))return 'R';
+ return '';
+}
+function findRarity(t){return normalizeRarity(t)}
 function findElement(t){const x=String(t);for(const e of ['風','光','闇','火','水','地'])if(new RegExp('(?:属性|エレメント)?\\s*'+e).test(x))return e;return ''}
 function findRole(t){const x=String(t);return ['特殊アタッカー','物理アタッカー','ヒーラー','タンク','サポーター','特殊型','アタッカー'].find(k=>x.includes(k))||''}
 function findMaxMP(t){const m=String(t).match(/(?:最大\s*)?MP\s*([0-9]+)/i);return m?Number(m[1]):0}
@@ -121,7 +128,7 @@ async function analyze(file){
  const nameCrop=cropNorm(im,.335,.103,.30,.042);
  const roleCrop=cropNorm(im,.335,.127,.38,.045);
  const mpCrop=cropNorm(im,.335,.160,.30,.040);
- const rarityCrop=cropNorm(im,.065,.085,.095,.055);
+ const rarityCrop=cropNorm(im,.065,.050,.105,.065);
  const skillCrop=cropNorm(im,.065,.125,.88,.430);
  const titleRaw=await repeatedFieldOCR(titleCrop,[7,6,13]);
  const titleCandidates=chars.map(c=>c.title||c.variant_title||'').filter(Boolean);
@@ -131,14 +138,20 @@ async function analyze(file){
  const nameResult=await repeatedNameOCR(nameCrop,chars,title);
  const name=nameResult.value;
  const roleText=await ocrRegion(roleCrop,7),mpText=await ocrRegion(mpCrop,7),rarityText=await ocrRegion(rarityCrop,6),skillText=await ocrRegion(skillCrop,6);
- const role=findRole(roleText),mp=findMaxMP(mpText),rarity=findRarity(rarityText);
+ const rarityRaw=await repeatedFieldOCR(rarityCrop,[7,8,6,13]);
+ const rarityVotes=rarityRaw.map(normalizeRarity).filter(Boolean);
+ const rarityCounts=rarityVotes.reduce((m,x)=>(m[x]=(m[x]||0)+1,m),{});
+ let rarity=Object.entries(rarityCounts).sort((a,b)=>b[1]-a[1])[0]?.[0]||findRarity(rarityText);
+ const role=findRole(roleText),mp=findMaxMP(mpText);
  const element=detectElementVisual(im)||findElement(await ocrRegion(cropNorm(im,.265,.075,.08,.075),6));
  const skills=parseSkills(skillText);
  const existing=bestExisting(name,title,chars);
+ if(existing?.rarity&&['SSR','SR','R'].includes(existing.rarity))rarity=existing.rarity;
  const cardCrop=cropNorm(im,.065,.085,.095,.075,'image/jpeg',.95);
  return {version:'2.2.0',filename:file.name,source_image:src,card_image:cardCrop,name,title,rarity,element,role,max_mp:mp,skills,
   name_ocr_confidence:nameResult.confidence,name_ocr_candidates:nameResult.raw,
   header_ocr:[title,name,roleText,mpText,rarityText].join('\n'),
+  rarity_ocr_candidates:rarityRaw,rarity_ocr_votes:rarityVotes,
   title_ocr_candidates:titleRaw,name_ocr_source:nameResult.source,name_ocr_match_id:nameResult.matched_id||null,skill_ocr:skillText,
   ocr_text:[title,name,roleText,mpText,rarityText,skillText].join('\n'),
   existing_id:existing?.id||null,created_at:new Date().toISOString()};
