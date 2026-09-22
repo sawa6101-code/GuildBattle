@@ -1,7 +1,7 @@
-/* GuildBattle - OCR New Character Registration */
+/* GuildBattle - Full Character Detail Screenshot Registration v2 */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle', V=4;
+const DB='paranoise-guildbattle',V=4;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const norm=s=>String(s??'').normalize('NFKC').replace(/[\s　・･「」『』()（）［］【】]/g,'').toLowerCase();
@@ -9,70 +9,98 @@ function openDB(){return new Promise((ok,no)=>{const r=indexedDB.open(DB,V);r.on
 function all(d,n){return new Promise((ok,no)=>{const r=d.transaction(n).objectStore(n).getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
 function put(d,n,x){return new Promise((ok,no)=>{const r=d.transaction(n,'readwrite').objectStore(n).put(x);r.onsuccess=()=>ok(x);r.onerror=()=>no(r.error)})}
 function fileData(f){return new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f)})}
+function loadImg(src){return new Promise((ok,no)=>{const im=new Image();im.onload=()=>ok(im);im.onerror=()=>no(new Error('画像を読み込めません'));im.src=src})}
+function cropData(im,x,y,w,h,type='image/jpeg',quality=.9){const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w));c.height=Math.max(1,Math.round(h));c.getContext('2d').drawImage(im,x,y,w,h,0,0,c.width,c.height);return c.toDataURL(type,quality)}
 async function ensureOCR(){if(window.Tesseract)return;const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';document.head.appendChild(s);await new Promise((ok,no)=>{s.onload=ok;s.onerror=no})}
-async function ocr(src){await ensureOCR();const r=await Tesseract.recognize(src,'jpn+eng');return r.data?.text||''}
-const lines=text=>String(text).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-function findRarity(text){const t=String(text).toUpperCase().replace(/ＳＳＲ/g,'SSR').replace(/ＳＲ/g,'SR');const m=t.match(/\b(SSR|SR|R)\b/);return m?m[1]:''}
-function findElement(text){const t=String(text);for(const x of ['風','光','闇','火','水'])if(new RegExp('(?:属性|元素|エレメント)?\\s*'+x).test(t))return x;return ''}
-function findName(text,chars){
- const ls=lines(text);
- for(const l of ls){const hit=chars.find(c=>norm(c.name)===norm(l));if(hit)return {name:l,title:'',existing:hit}}
- for(const l of ls){const m=l.match(/(?:キャラクター名|名前|Name)\s*[:：]\s*(.+)$/i);if(m&&m[1].trim())return {name:m[1].trim(),title:'',existing:null}}
- const bad=/スキル|HP|攻撃|防御|速度|TU|倍率|Lv|レベル|覚醒|限界突破|パッシブ|アタック|EX|MP|状態異常|ターゲット/;
- const candidates=ls.filter(l=>/[一-龯ぁ-んァ-ヶ]/.test(l)&&l.length<=40&&!bad.test(l));
- return {name:candidates.sort((a,b)=>a.length-b.length)[0]||'',title:'',existing:null}
+async function ocr(src){await ensureOCR();try{const r=await Tesseract.recognize(src,'jpn+eng');return r.data?.text||''}catch{return ''}}
+const lines=t=>String(t).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+function cleanLine(s){return String(s??'').replace(/^[\s\-・●◆▶•]+/,'').trim()}
+function findRarity(t){const x=String(t).toUpperCase().replace(/ＳＳＲ/g,'SSR').replace(/ＳＲ/g,'SR');return x.match(/\b(SSR|SR|R)\b/)?.[1]||''}
+function findElement(t){const x=String(t);for(const e of ['風','光','闇','火','水','地'])if(new RegExp('(?:属性|エレメント)?\\s*'+e).test(x))return e;return ''}
+function findRole(t){const x=String(t);return ['特殊アタッカー','物理アタッカー','ヒーラー','タンク','サポーター','特殊型','アタッカー'].find(k=>x.includes(k))||''}
+function findMaxMP(t){const m=String(t).match(/(?:最大\s*)?MP\s*([0-9]+)/i);return m?Number(m[1]):0}
+function findLevel(t){const m=String(t).match(/Lv\.?\s*([0-9]+)/i);return m?Number(m[1]):0}
+function findPower(t){const m=String(t).match(/([0-9][0-9,]{5,})/);return m?Number(m[1].replace(/,/g,'')):0}
+function splitNameTitle(header,chars){
+ const ls=lines(header);
+ for(const l of ls){const h=chars.find(c=>norm(c.name)===norm(l));if(h)return {name:l,title:'',existing:h}}
+ let name='',title='';
+ for(let i=0;i<ls.length-1;i++){const a=cleanLine(ls[i]),b=cleanLine(ls[i+1]);if(/[一-龯ぁ-んァ-ヶ]/.test(a)&&/[一-龯ぁ-んァ-ヶ]/.test(b)&&a.length<=30&&b.length<=20&&!/特殊アタッカー|物理アタッカー|HP|Lv|最大|MP|戦力/.test(a+b)){title=a;name=b;break}}
+ if(!name){const label=ls.find(x=>/キャラクター名|名前|Name/i.test(x));if(label)name=label.replace(/.*?[:：]/,'').trim()}
+ return {name:cleanLine(name),title:cleanLine(title),existing:null}
 }
-function findTitle(text,name){const ls=lines(text);for(const l of ls){if(l===name)continue;const m=l.match(/(?:二つ名|タイトル|Title)\s*[:：]\s*(.+)$/i);if(m)return m[1].trim()}const m=String(name).match(/^(.+?)[（(](.+?)[）)]$/);return m?m[2]:''}
-function numberAfter(text,label){const m=String(text).match(new RegExp(label+'[^0-9]{0,15}([0-9][0-9,]*)','i'));return m?Number(m[1].replace(/,/g,'')):0}
+function numberAfter(text,label){const m=String(text).match(new RegExp(label+'[^0-9]{0,20}([0-9][0-9,]*)','i'));return m?Number(m[1].replace(/,/g,'')):0}
 function parseStats(text){return{base_hp:numberAfter(text,'(?:基礎)?(?:HP|体力)'),base_attack:numberAfter(text,'(?:基礎)?(?:攻撃|ATK|攻撃力)'),base_defense:numberAfter(text,'(?:基礎)?(?:防御|DEF|防御力)'),base_speed:numberAfter(text,'(?:基礎)?(?:速度|SPD|スピード)')}}
+function parseStars(text){const t=String(text).replace(/[☆✦✧]/g,'★');const a=(t.match(/★/g)||[]).length;return a>=1&&a<=4?a:null}
 function parseSkills(text){
- const ls=lines(text),out=[];
- for(let i=0;i<ls.length;i++){const q=ls.slice(i,i+5).join(' ');if(!/(アタック|サバイバー|シリアル|タイムストライク|ドリーム|ポイズン|スタン|スリープ|睡眠|毒|ヒール|回復|EX|根性|ガッツ|スキン|復讐|反転|ドレイン|ハンター)/i.test(q))continue;
-  const mm=q.match(/([0-9]+(?:\.[0-9]+)?)\s*[x×倍]/i),tm=q.match(/([0-9]{1,3})\s*TU/i);
-  const target=(q.match(/全体|2体|2人|ランダム2|敵1体|単体|味方全体|味方1体|自分/)||[])[0]||'';
-  const statuses=['毒','睡眠','スタン','火傷','凍結','麻痺','スロウ','眠り'].filter(x=>q.includes(x));
-  const condition=(q.match(/(?:HP|TU|撃破|生存|条件|MP).{0,60}/)||[])[0]||'';
-  const rawName=ls[i].replace(/^[-・●◆▶]+/,'').trim();
-  if(!rawName||out.some(s=>norm(s.name)===norm(rawName)))continue;
-  out.push({name:rawName,type:/回復|ヒール/.test(q)?'heal':'damage',target,multiplier:mm?Number(mm[1]):null,tu:tm?Number(tm[1]):null,status_effects:statuses,conditions:condition?[condition]:[],ex:/\bEX\b|ＥＸ/.test(q),raw:q,source:'screenshot_ocr_new_registration'});
+ const ls=lines(text),skills=[],skillWords=/アタック|サバイバー|シリアル|タイムストライク|ドリーム|ポイズン|スタン|スリープ|睡眠|毒|ヒール|回復|EX|ガッツ|根性|スキン|復讐|反転|ドレイン|ハンター|オート|入場/i;
+ for(let i=0;i<ls.length;i++){const first=cleanLine(ls[i]),q=ls.slice(i,Math.min(ls.length,i+5)).join(' ');if(!skillWords.test(q))continue;
+  const mm=q.match(/([0-9]+(?:\.[0-9]+)?)\s*[x×倍]/i),tm=q.match(/([0-9]{1,3})\s*TU/i),mp=q.match(/(?:[-−]\s*)?([0-9]+)\s*MP/i),target=(q.match(/全体|ランダム\s*\d+\s*体|\d+\s*体|敵\d*体|味方\d*体|敵1体|単体|自分/)||[])[0]||'';
+  const statuses=['毒','睡眠','スタン','火傷','凍結','麻痺','スロウ','眠り','ガード'].filter(x=>q.includes(x)),conditions=[];
+  const cm=q.match(/HP\s*[0-9]+%?\s*(?:未満|以下|以上|超)/);if(cm)conditions.push(cm[0]);
+  const tuC=q.match(/[0-9]{2,3}\s*TU\s*(?:生存|以上|未満|以下)/);if(tuC)conditions.push(tuC[0]);
+  if(/戦闘中各1回|戦闘中1回|1回のみ|一度のみ/.test(q))conditions.push('使用回数:1');
+  if(/撃破|倒した|戦闘不能/.test(q))conditions.push('撃破/戦闘不能条件');
+  const type=/回復|ヒール/.test(q)?'heal':/スキン|復讐|入場|オート/.test(q)?'passive':'damage';
+  if(!first||skills.some(s=>norm(s.name)===norm(first)))continue;
+  skills.push({name:first,type,target,multiplier:mm?Number(mm[1]):null,tu:tm?Number(tm[1]):null,mp:mp?Number(mp[1]):null,status_effects:statuses,conditions,ex:/\bEX\b|ＥＸ/.test(q),raw:q,source:'full_detail_screenshot_ocr'});
  }
- return out.slice(0,30)
+ return skills.filter(s=>s.name.length<=80).slice(0,30)
 }
-function nextId(chars){let n=1;while(chars.some(c=>c.id==='CHR-'+String(n).padStart(4,'0')))n++;return 'CHR-'+String(n).padStart(4,'0')}
+function bestExisting(name,title,chars){
+ const combo=title?norm(name+'（'+title+'）'):norm(name);
+ return chars.find(c=>norm(c.name)===combo||norm(c.name)===norm(name)||((norm(c.base_name||'')===norm(name))&&(title?norm(c.title||c.variant_title||'')===norm(title):true)))||null;
+}
+function featureVector(src){return loadImg(src).then(im=>{const c=document.createElement('canvas');c.width=c.height=16;c.getContext('2d').drawImage(im,0,0,16,16);const p=c.getContext('2d').getImageData(0,0,16,16).data,v=[];for(let i=0;i<p.length;i+=4)v.push(Math.round(p[i]/32),Math.round(p[i+1]/32),Math.round(p[i+2]/32));return v})}
+async function analyze(file){
+ const db=await openDB(),chars=await all(db,'characters');db.close();
+ const src=await fileData(file),im=await loadImg(src),w=im.naturalWidth||im.width,h=im.naturalHeight||im.height;
+ const headerCrop=cropData(im,w*.27,h*.06,w*.60,h*.20),skillCrop=cropData(im,w*.07,h*.18,w*.86,h*.72);
+ const fullText=await ocr(src),headerText=await ocr(headerCrop),skillText=await ocr(skillCrop),combined=[fullText,headerText,skillText].join('\n');
+ const info=splitNameTitle(headerText+'\n'+fullText,chars),rarity=findRarity(combined),element=findElement(combined),role=findRole(combined),maxMp=findMaxMP(combined),level=findLevel(headerText),power=findPower(headerText),stats=parseStats(combined),skills=parseSkills(skillText+'\n'+fullText),awakening=parseStars(skillText);
+ const cardCrop=cropData(im,w*.09,h*.085,w*.18,h*.125,'image/jpeg',.92),existing=bestExisting(info.name,info.title,chars);
+ return {version:'2.0.0',filename:file.name,source_image:src,card_image:cardCrop,ocr_text:combined,header_ocr:headerText,skill_ocr:skillText,name:info.name,title:info.title,full_name:info.title?info.name+'（'+info.title+'）':info.name,rarity,element,role,max_mp:maxMp,level,power,stats,skills,observed_awakening:awakening,existing_id:existing?.id||null,created_at:new Date().toISOString()}
+}
 function installUI(){
- const head=document.querySelector('#characters .section-head');if(!head||$('#ocrNewCharacterButton'))return;
- const b=document.createElement('button');b.type='button';b.className='small';b.id='ocrNewCharacterButton';b.textContent='📷 OCR新規登録';head.appendChild(b);
- const box=document.createElement('div');box.id='ocrNewCharacterBox';box.className='card hidden';
- box.innerHTML='<h3>📷 未登録キャラクターをスクショから自動作成</h3><p class="hint">スクショのOCR結果から名前・タイトル・レアリティ・属性・基礎値・スキル候補を作成します。確定前に必ず確認してください。</p><label class="upload"><input id="ocrNewCharacterFile" type="file" accept="image/*">キャラクタースクショ</label><label class="upload"><input id="ocrNewSkillFiles" type="file" accept="image/*" multiple>スキルスクショ（任意・複数可）</label><button type="button" class="wide primary" id="ocrNewCharacterAnalyze">🔍 OCR解析して登録候補を作成</button><div id="ocrNewCharacterStatus" class="hint"></div><div id="ocrNewCharacterPreview"></div>';
- $('#characters').insertBefore(box,$('#characterForm'));
- b.onclick=()=>{box.classList.toggle('hidden');if(!box.classList.contains('hidden'))box.scrollIntoView({behavior:'smooth',block:'start'})};
- $('#ocrNewCharacterAnalyze').onclick=analyze
+ const head=document.querySelector('#characters .section-head');if(!head)return;
+ if($('#ocrFullCharacterButton'))return;
+ const b=document.createElement('button');b.type='button';b.className='small';b.id='ocrFullCharacterButton';b.textContent='📷 1枚から全情報登録';head.appendChild(b);
+ const box=document.createElement('div');box.id='ocrFullCharacterBox';box.className='card hidden';
+ box.innerHTML='<h3>📷 詳細スクショ1枚からキャラクターDB登録</h3><p class="hint">上部からキャラ名・種別・属性・役割・最大MP・レベル・戦力、下部からパッシブ／アクティブスキルを抽出します。キャラ画像も画像マスターへ保存します。</p><label class="upload"><input id="ocrFullCharacterFile" type="file" accept="image/*">キャラクター詳細スクショ</label><button type="button" class="wide primary" id="ocrFullCharacterAnalyze">🔍 1枚を解析</button><div id="ocrFullCharacterStatus" class="hint"></div><div id="ocrFullCharacterPreview"></div>';
+ $('#characters').insertBefore(box,$('#characterForm'));b.onclick=()=>{box.classList.toggle('hidden');if(!box.classList.contains('hidden'))box.scrollIntoView({behavior:'smooth',block:'start'})};$('#ocrFullCharacterAnalyze').onclick=run;
 }
-async function analyze(){
- const f=$('#ocrNewCharacterFile')?.files?.[0];if(!f)return alert('キャラクタースクショを選択してください。');
- const status=$('#ocrNewCharacterStatus'),preview=$('#ocrNewCharacterPreview');status.textContent='OCR解析中…';preview.innerHTML='';
+async function run(){
+ const f=$('#ocrFullCharacterFile')?.files?.[0];if(!f)return alert('キャラクター詳細スクショを選択してください。');
+ const st=$('#ocrFullCharacterStatus'),pv=$('#ocrFullCharacterPreview');st.textContent='画像全体を解析中…';pv.innerHTML='';
  try{
-  const d=await openDB(),chars=await all(d,'characters');d.close();const blob=await fileData(f),text=await ocr(blob),info=findName(text,chars);
-  const skills=[];for(const sf of [...($('#ocrNewSkillFiles')?.files||[])])skills.push(...parseSkills(await ocr(await fileData(sf))));
-  const stats=parseStats(text),rarity=findRarity(text),element=findElement(text),title=findTitle(text,info.name),duplicate=info.existing;
-  window.__ocrNewCharacterCtx={blob,text,chars,duplicate,skills,stats,rarity,element,title,name:info.name,filename:f.name};
-  if(duplicate){status.textContent='⚠️ OCR名が既存キャラクターと一致しました。新規登録を停止しました。';preview.innerHTML='<div class="notice"><b>既存ID:</b> '+esc(duplicate.id)+' / '+esc(duplicate.name)+'<br>既存キャラのスクショ結びつけは「📷 スクショ登録」を使用してください。</div>';return}
-  const suggestedId=nextId(chars);status.textContent='🟡 登録候補を作成しました。内容を確認してから確定してください.';
-  preview.innerHTML='<div class="meta-grid"><label>自動発行ID<input id="ocrNewId" value="'+esc(suggestedId)+'" readonly></label><label>キャラクター名<input id="ocrNewName" value="'+esc(info.name)+'"></label><label>タイトル<input id="ocrNewTitle" value="'+esc(title)+'"></label><label>レアリティ<input id="ocrNewRarity" value="'+esc(rarity)+'" placeholder="OCR未検出なら手入力"></label><label>属性<input id="ocrNewElement" value="'+esc(element)+'" placeholder="OCR未検出なら手入力"></label><label>基礎HP<input id="ocrNewHp" type="number" value="'+(stats.base_hp||0)+'"></label><label>基礎攻撃<input id="ocrNewAtk" type="number" value="'+(stats.base_attack||0)+'"></label><label>基礎防御<input id="ocrNewDef" type="number" value="'+(stats.base_defense||0)+'"></label><label>基礎速度<input id="ocrNewSpeed" type="number" value="'+(stats.base_speed||0)+'"></label></div><label>OCR全文<textarea id="ocrNewRaw" rows="7">'+esc(text)+'</textarea></label><div class="notice"><b>🧩 OCRスキル候補: '+skills.length+'件</b><br>'+(skills.length?skills.map(s=>'・'+esc(s.name)+' / '+esc(s.target||'—')+' / '+(s.multiplier??'—')+'x / '+(s.tu??'—')+'TU / '+esc(s.status_effects.join(','))).join('<br>'):'スキル情報なし')+'</div><button type="button" class="wide primary" id="ocrNewCharacterConfirm">✅ この内容で新規キャラクターを作成</button>';
-  $('#ocrNewCharacterConfirm').onclick=confirmCreate
- }catch(e){console.error(e);status.textContent='OCR解析に失敗しました: '+(e?.message||String(e))}
+  const r=await analyze(f);window.__ocrFullCharacterLast=r;const dup=r.existing_id;
+  st.textContent=dup?'⚠️ 既存候補が見つかりました。':'🟡 OCRから新規登録候補を作成しました。';
+  pv.innerHTML='<div class="notice"><b>キャラ名:</b> '+esc(r.name||'未検出')+'<br><b>種別:</b> '+esc(r.title||'未検出')+'<br><b>統合名:</b> '+esc(r.full_name||'')+'<br><b>レアリティ:</b> '+esc(r.rarity||'未検出')+' / <b>属性:</b> '+esc(r.element||'未検出')+' / <b>役割:</b> '+esc(r.role||'未検出')+'<br><b>最大MP:</b> '+(r.max_mp||'未検出')+' / <b>Lv:</b> '+(r.level||'未検出')+' / <b>戦力:</b> '+(r.power?r.power.toLocaleString():'未検出')+'<br><b>画面上の★:</b> '+(r.observed_awakening===null?'未検出':'★'+r.observed_awakening+'（観測値）')+'</div>'+
+  '<div class="meta-grid"><label>自動発行ID<input id="ocrFullId" readonly></label><label>キャラ名<input id="ocrFullName" value="'+esc(r.name)+'"></label><label>種別（タイトル）<input id="ocrFullTitle" value="'+esc(r.title)+'"></label><label>レアリティ<input id="ocrFullRarity" value="'+esc(r.rarity)+'"></label><label>属性<input id="ocrFullElement" value="'+esc(r.element)+'"></label><label>役割<input id="ocrFullRole" value="'+esc(r.role)+'"></label><label>最大MP<input id="ocrFullMP" type="number" value="'+(r.max_mp||0)+'"></label></div>'+
+  '<label>スキル解析結果<textarea id="ocrFullSkills" rows="12">'+esc(JSON.stringify(r.skills,null,2))+'</textarea></label>'+
+  '<label>OCR全文<textarea id="ocrFullRaw" rows="8">'+esc(r.ocr_text)+'</textarea></label>'+
+  '<div class="notice">'+(dup?('⚠️ 既存候補: '+esc(dup)+'。既存キャラなら新規作成ではなくスクショ結び付けを使用します。'):'保存時に空いているCHR-IDを自動採番します。')+'</div>'+
+  '<button type="button" class="wide primary" id="ocrFullConfirm">✅ 内容を確認して登録</button>';
+  $('#ocrFullId').value=dup||'保存時自動採番';$('#ocrFullConfirm').onclick=()=>confirmSave(r,dup);
+ }catch(e){console.error(e);st.textContent='解析エラー: '+(e?.message||String(e))}
 }
-async function confirmCreate(){
- const ctx=window.__ocrNewCharacterCtx;if(!ctx)return;const name=$('#ocrNewName')?.value.trim();if(!name)return alert('キャラクター名を入力してください。');
- const d=await openDB(),chars=await all(d,'characters');if(chars.some(c=>norm(c.name)===norm(name))){d.close();return alert('同名キャラクターが既に存在します。新規作成を中止しました。既存キャラのスクショ結びつけを使用してください。')}
- const id=nextId(chars),ts=new Date().toISOString(),obj={id,name,title:$('#ocrNewTitle')?.value.trim()||'',rarity:$('#ocrNewRarity')?.value.trim()||'',element:$('#ocrNewElement')?.value.trim()||'',base_hp:Number($('#ocrNewHp')?.value)||0,base_attack:Number($('#ocrNewAtk')?.value)||0,base_defense:Number($('#ocrNewDef')?.value)||0,base_speed:Number($('#ocrNewSpeed')?.value)||0,skills:ctx.skills,skill_data:{skills:ctx.skills},battle_profile:{skills:ctx.skills},status_effects:'',version:1,source:'screenshot_ocr_new_registration',verification_status:'ocr_created_unverified',verification_required:true,screenshot_confirmed:false,ocr_source_filename:ctx.filename,ocr_text:ctx.text,created_at:ts,updated_at:ts,active:true};
+async function confirmSave(r,dup){
+ const d=await openDB(),chars=await all(d,'characters'),name=$('#ocrFullName')?.value.trim(),title=$('#ocrFullTitle')?.value.trim()||'';
+ if(!name){d.close();return alert('キャラクター名が取得できていません。')}
+ const existing=bestExisting(name,title,chars)||chars.find(c=>c.id===dup);
+ if(existing){d.close();return alert('既存キャラクター候補があります。新規作成は行わず、既存キャラクターの「📷 スクショ登録」で画像・スキルを結び付けてください。\n候補: '+existing.id)}
+ let n=1;while(chars.some(c=>c.id==='CHR-'+String(n).padStart(4,'0')))n++;
+ const id='CHR-'+String(n).padStart(4,'0'),ts=new Date().toISOString();
+ let skills=[];try{skills=JSON.parse($('#ocrFullSkills')?.value||'[]')}catch{skills=r.skills||[]}
+ const obj={id,name:title?name+'（'+title+'）':name,base_name:name,title,variant_title:title,rarity:$('#ocrFullRarity')?.value.trim()||'',element:$('#ocrFullElement')?.value.trim()||'',role:$('#ocrFullRole')?.value.trim()||'',max_mp:Number($('#ocrFullMP')?.value)||0,base_hp:r.stats.base_hp||0,base_attack:r.stats.base_attack||0,base_defense:r.stats.base_defense||0,base_speed:r.stats.base_speed||0,skills,skill_data:{skills},battle_profile:{skills},passives:skills.filter(s=>s.type==='passive'),status_effects:[...new Set(skills.flatMap(s=>s.status_effects||[]))],version:1,source:'full_detail_screenshot_ocr',verification_status:'ocr_created_unverified',verification_required:true,screenshot_confirmed:false,observed_level:r.level||0,observed_power:r.power||0,observed_awakening:r.observed_awakening,ocr_source_filename:r.filename,ocr_text:r.ocr_text,created_at:ts,updated_at:ts,active:true};
  await put(d,'characters',obj);
- if(d.objectStoreNames.contains('characterScreenshots'))await put(d,'characterScreenshots',{id:'cs_'+crypto.randomUUID(),character_id:id,match_status:'CREATED_UNVERIFIED',match_stage:5,match_confidence:1,filename:ctx.filename,blob:ctx.blob,ocr_text:ctx.text,created_at:ts,source:'screenshot_ocr_new_registration'});
- if(d.objectStoreNames.contains('characterImages'))await put(d,'characterImages',{id:'img_'+crypto.randomUUID(),character_id:id,image_type:'card',blob:ctx.blob,verified:false,verification_source:'ocr_new_registration',created_at:ts});
- if(ctx.skills.length&&d.objectStoreNames.contains('characterSkillSources'))await put(d,'characterSkillSources',{id:'skill_'+crypto.randomUUID(),character_id:id,source:'screenshot_ocr_new_registration',created_at:ts,skills:ctx.skills});
- d.close();if($('#ocrNewCharacterBox'))$('#ocrNewCharacterBox').classList.add('hidden');if(window.renderCharacters)await window.renderCharacters();if(window.refreshStats)await window.refreshStats();alert(name+'（'+id+'）をOCR結果から新規登録しました。\\n検証状態: 未確認');
+ if(d.objectStoreNames.contains('characterScreenshots'))await put(d,'characterScreenshots',{id:'cs_'+crypto.randomUUID(),character_id:id,match_status:'CREATED_UNVERIFIED',match_stage:5,match_confidence:.9,filename:r.filename,blob:r.source_image,ocr_text:r.ocr_text,created_at:ts,source:'full_detail_screenshot_ocr'});
+ if(d.objectStoreNames.contains('characterImages'))await put(d,'characterImages',{id:'img_'+crypto.randomUUID(),character_id:id,image_type:'card',blob:r.card_image,verified:false,verification_source:'full_detail_screenshot_ocr',created_at:ts});
+ if(d.objectStoreNames.contains('characterSkillSources'))await put(d,'characterSkillSources',{id:'skill_'+crypto.randomUUID(),character_id:id,source:'full_detail_screenshot_ocr',filename:r.filename,ocr_text:r.skill_ocr,skills,created_at:ts});
+ d.close();if($('#ocrFullCharacterBox'))$('#ocrFullCharacterBox').classList.add('hidden');if(window.renderCharacters)await window.renderCharacters();if(window.refreshStats)await window.refreshStats();
+ alert((title?name+'（'+title+'）':name)+'（'+id+'）を詳細スクショ1枚から登録しました。\n画像・スキル・OCR証拠も保存済み。\n検証状態: 未確認');
 }
-window.ParanoiseOCRNewCharacter={VERSION:'1.0',analyze,confirmCreate,installUI};
+window.ParanoiseOCRNewCharacter={VERSION:'2.0.0',analyze,confirmCreate:confirmSave,installUI};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installUI);else installUI();
 new MutationObserver(()=>installUI()).observe(document.body,{childList:true,subtree:true});
 })();
