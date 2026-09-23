@@ -17,25 +17,30 @@ function show(view){$$('.view').forEach(v=>v.classList.remove('active'));$('#'+v
 $$('[data-view]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.view)));
 async function createMemberSlot(guildId,no){const m={id:uid('member'),guild_id:guildId,member_no:no,name:'',active:true,memo:'',created_at:now(),updated_at:now()};await put('members',m);for(let n=1;n<=2;n++)await put('parties',{id:uid('party'),member_id:m.id,party_no:n,name:`PT${n}`,total_power:0,hp_current:0,hp_max:0,fatigue_value:0,fatigue_multiplier:1,battle_count:0,win_count:0,loss_count:0,draw_count:0,active:true,created_at:now(),updated_at:now()});return m}
 async function ensureOwn(){let g=(await all('guilds')).find(x=>x.side==='OWN'||x.side==='own');if(!g){g={id:uid('guild'),name:'自軍ギルド',side:'OWN',guild_no:0,active:true,created_at:now(),updated_at:now()};await put('guilds',g)}return g}
-async function deleteMember(id){
+async function protectedDeleteMember(id,skipConfirm=false){
  const m=await get('members',id);if(!m)return;
  const label=m.name?.trim()?m.name.trim():'未登録';
- if(!confirm(`「${label}」を削除しますか？\\nメンバー情報・PT1/PT2・PT内キャラクター配置も削除されます。`))return;
- const pw=prompt('削除を実行するにはパスワードを入力してください。');
- if(pw!=='4323')return alert('パスワードが正しくありません。削除しませんでした。');
+ if(!skipConfirm && !confirm(`「${label}」を削除しますか？\\nメンバー情報・PT1/PT2・PT内キャラクター配置も削除されます。`))return false;
+ if(!skipConfirm){const pw=prompt('削除を実行するにはパスワードを入力してください。');if(pw!=='4323'){alert('パスワードが正しくありません。削除しませんでした。');return false;}}
  const ps=(await all('parties')).filter(p=>p.member_id===id),pcs=await all('partyCharacters');
  for(const p of ps){for(const pc of pcs.filter(x=>x.party_id===p.id))await remove('partyCharacters',pc.id);await remove('parties',p.id);}
- await remove('members',id);
- if(window.currentMemberId===id)window.currentMemberId=null;
- await refreshStats();await renderOwn();await renderGuilds();
- alert(`「${label}」を削除しました。`);
+ await remove('members',id);return true;
+}
+async function deleteMember(id){if(await protectedDeleteMember(id)){await refreshStats();await renderOwn();await renderGuilds();alert('メンバーを削除しました。')}}
+async function deleteGuild(id){
+ const g=await get('guilds',id);if(!g)return;
+ if(g.side==='OWN'||g.side==='own')return alert('自軍ギルド本体はこの画面から削除できません。');
+ if(!confirm(`敵ギルド「${g.name}」を削除しますか？\\n所属メンバー・PT・キャラクター配置も削除されます。`))return;
+ const pw=prompt('削除を実行するにはパスワードを入力してください。');if(pw!=='4323')return alert('パスワードが正しくありません。削除しませんでした。');
+ const ms=(await all('members')).filter(m=>m.guild_id===id);for(const m of ms)await protectedDeleteMember(m.id,true);
+ await remove('guilds',id);await refreshStats();await renderGuilds();alert(`敵ギルド「${g.name}」を削除しました。`);
 }
 async function addOwnMember(){try{const g=await ensureOwn();let ms=(await all('members')).filter(m=>m.guild_id===g.id).sort((a,b)=>a.member_no-b.member_no);let m=ms.find(x=>!String(x.name||'').trim());if(!m){if(ms.length>=25)return alert('自軍は最大25人です。');m=await createMemberSlot(g.id,ms.length+1)}const name=prompt('プレイヤー名');if(name===null||!name.trim())return;const level=Number(prompt('Lv（不明なら0）','0'))||0;const power=Number((prompt('戦力（不明なら0）','0')||'0').replace(/,/g,''))||0;const points=Number((prompt('野望ポイント（不明なら0）','0')||'0').replace(/,/g,''))||0;m.name=name.trim();m.profile_level=level;m.battle_power=power;m.ambition_points=points;m.source='manual';m.updated_at=now();await put('members',m);await renderOwn();await refreshStats();alert(name.trim()+'を自軍に登録しました。PT1/PT2を編集できます。')}catch(err){console.error('addOwnMember error',err);alert('自軍メンバー追加に失敗しました。\n'+(err?.message||String(err)))}}
 async function addGuild(){const gs=(await all('guilds')).filter(g=>g.side==='ENEMY');if(gs.length>=16)return alert('敵ギルドは最大16ギルドです。');const name=prompt('ギルド名',`ギルド${String.fromCharCode(65+gs.length)}`);if(name===null)return;const no=gs.length+1;const g={id:uid('guild'),name:name.trim()||`ギルド${no}`,side:'ENEMY',guild_no:no,active:true,created_at:now(),updated_at:now()};await put('guilds',g);for(let i=1;i<=25;i++)await createMemberSlot(g.id,i);await renderGuilds();await refreshStats()}
 async function refreshStats(){const gs=await all('guilds'),ms=await all('members'),ps=await all('parties'),cs=await all('characters');const own=gs.find(g=>g.side==='OWN');$('#ownCount').textContent=`${ms.filter(m=>m.guild_id===own?.id).length} / 25`;$(`#guildCount`).textContent=`${gs.filter(g=>g.side==='ENEMY').length} / 16`;const pc=$('#partyCount');if(pc)pc.textContent=ps.length;const cc=$('#characterCount');if(cc)cc.textContent=cs.length}
 function memberRow(m,side){return `<div class="row"><div class="badge">${String(m.member_no).padStart(2,'0')}</div><div class="row-main"><div class="row-title">${esc(m.name)||'未登録'}</div><div class="row-sub">PT1 / PT2</div></div><div class="row-actions"><button onclick="openMember('${m.id}','${side}')">編集</button><button class="danger" onclick="deleteMember('${m.id}')">削除</button></div></div>`}
 async function renderOwn(){const g=await ensureOwn();const ms=(await all('members')).filter(m=>m.guild_id===g.id).sort((a,b)=>a.member_no-b.member_no);$('#ownList').innerHTML=ms.map(m=>memberRow(m,'own')).join('');bindPlusButtons()}
-async function renderGuilds(){const gs=(await all('guilds')).filter(g=>g.side==='ENEMY').sort((a,b)=>a.guild_no-b.guild_no);$('#guildList').innerHTML=gs.length?gs.map(g=>`<div class="row"><div class="badge">${String(g.guild_no).padStart(2,'0')}</div><div class="row-main"><div class="row-title">${esc(g.name)}</div><div class="row-sub">25人 / 50PT</div></div><div class="row-actions"><button onclick="openGuild('${g.id}')">開く</button></div></div>`).join(''):'<div class="empty">敵ギルドが未登録です。「＋」から追加してください。</div>';bindPlusButtons()}
+async function renderGuilds(){const gs=(await all('guilds')).filter(g=>g.side==='ENEMY').sort((a,b)=>a.guild_no-b.guild_no);$('#guildList').innerHTML=gs.length?gs.map(g=>`<div class="row"><div class="badge">${String(g.guild_no).padStart(2,'0')}</div><div class="row-main"><div class="row-title">${esc(g.name)}</div><div class="row-sub">25人 / 50PT</div></div><div class="row-actions"><button onclick="openGuild('${g.id}')">開く</button><button class="danger" onclick="deleteGuild('${g.id}')">削除</button></div></div>`).join(''):'<div class="empty">敵ギルドが未登録です。「＋」から追加してください。</div>';bindPlusButtons()}
 async function openGuild(id){currentGuildId=id;const g=await get('guilds',id);const ms=(await all('members')).filter(m=>m.guild_id===id).sort((a,b)=>a.member_no-b.member_no);$('#guildTitle').textContent=g.name;$('#memberList').innerHTML=ms.map(m=>memberRow(m,'enemy')).join('');show('guildDetail')}
 function charLabel(c){if(!c)return '未登録';return `${c.name||c.id} [${c.id}]${c.rarity?'・'+c.rarity:''}${c.element?'・'+c.element:''}`}
 function charOptions(chars,selected){return `<option value="">-- キャラクター未登録 --</option>`+chars.slice().sort((a,b)=>String(a.id).localeCompare(String(b.id),'ja',{numeric:true})).map(c=>`<option value="${esc(c.id)}" ${c.id===selected?'selected':''}>${esc(charLabel(c))}</option>`).join('')}
@@ -54,23 +59,15 @@ $('#exportData').onclick=async()=>{const out={schema_version:2,exported_at:now()
 $('#restoreInput').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async()=>{try{const data=JSON.parse(r.result);for(const s of STORES)for(const x of(data[s]||[]))await put(s,x);await ensureOwn();await refreshStats();await renderOwn();await renderGuilds();await renderCharacters();alert('データを復元しました。')}catch(err){console.error(err);alert('JSONの読み込みに失敗しました。')}};r.readAsText(f)});
 $('#resetData').onclick=async()=>{if(!confirm('すべての登録データを初期化します。よろしいですか？'))return;for(const s of STORES)await clear(s);await ensureOwn();await refreshStats();await renderOwn();await renderGuilds();await renderCharacters();alert('初期化しました。')};
 async function cleanupRequestedData(){
- const pw=prompt('初回整理を実行するには管理パスワードを入力してください。');
- if(pw!=='4323')return alert('パスワードが正しくありません。整理を中止しました。');
+ const pw=prompt('初回整理を実行するには管理パスワードを入力してください。');if(pw!=='4323')return alert('パスワードが正しくありません。整理を中止しました。');
  const own=(await all('guilds')).find(g=>g.side==='OWN'||g.side==='own');
- if(own){
-   const ms=(await all('members')).filter(m=>m.guild_id===own.id&&(!String(m.name||'').trim()||m.name==='未登録'));
-   for(const m of ms)await deleteMember(m.id);
- }
- const enemies=(await all('guilds')).filter(g=>g.side==='ENEMY'||g.side==='enemy').filter(g=>Number(g.guild_no)>=2&&Number(g.guild_no)<=16);
- for(const g of enemies){
-   const ms=(await all('members')).filter(m=>m.guild_id===g.id);
-   for(const m of ms){const ps=(await all('parties')).filter(p=>p.member_id===m.id),pcs=await all('partyCharacters');for(const p of ps){for(const pc of pcs.filter(x=>x.party_id===p.id))await remove('partyCharacters',pc.id);await remove('parties',p.id)}await remove('members',m.id)}
-   await remove('guilds',g.id);
- }
- await refreshStats();await renderOwn();await renderGuilds();
- alert('自軍の未登録メンバーと敵ギルド2〜16を削除しました。');
+ let removedOwn=0,removedGuilds=0;
+ if(own){const ms=(await all('members')).filter(m=>m.guild_id===own.id&&!String(m.name||'').trim());for(const m of ms)if(await protectedDeleteMember(m.id,true))removedOwn++;}
+ const enemies=(await all('guilds')).filter(g=>(g.side==='ENEMY'||g.side==='enemy')&&Number(g.guild_no)>=2&&Number(g.guild_no)<=16);
+ for(const g of enemies){const ms=(await all('members')).filter(m=>m.guild_id===g.id);for(const m of ms)await protectedDeleteMember(m.id,true);await remove('guilds',g.id);removedGuilds++;}
+ await refreshStats();await renderOwn();await renderGuilds();alert(`整理完了：自軍未登録 ${removedOwn}人、敵ギルド2〜16を ${removedGuilds}ギルド削除しました。`);
 }
-window.deleteMember=deleteMember;window.cleanupRequestedData=cleanupRequestedData;
+window.deleteMember=deleteMember;window.deleteGuild=deleteGuild;window.cleanupRequestedData=cleanupRequestedData;
 async function init(){await openDB();await ensureOwn();await refreshStats();await renderOwn();await renderCharacters();setupAppUpdater()}
 /* App update controller */
 const APP_VERSION='2026.09.19-v20';
