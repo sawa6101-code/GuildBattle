@@ -6,7 +6,7 @@
 (function(){
 'use strict';
 const DB='paranoise-guildbattle';
-const VERSION='2.0.0';
+const VERSION='3.0.0';
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const norm=s=>String(s??'').normalize('NFKC').replace(/[\s　]+/g,'').toLowerCase();
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
@@ -82,24 +82,69 @@ function visualAwakening(data){
   return {value:null,confidence:0,source:'visual_none'};
  })
 }
+async function ocrFullImage(data){
+ if(!window.Tesseract){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=res;s.onerror=()=>rej(new Error('OCRエンジンの読み込みに失敗しました'));document.head.appendChild(s)});}
+ try{
+  const r=await Tesseract.recognize(data,'jpn+eng',{logger:()=>{}});
+  return {text:r?.data?.text||'',words:r?.data?.words||[]};
+ }catch{return {text:'',words:[]}}
+}
+function slotBoxes(w,h){
+ const ratio=w/h;
+ if(ratio>=2.2)return Array.from({length:6},(_,i)=>({x:w*i/6,y:0,w:w/6,h:h}));
+ if(ratio>=1.2)return Array.from({length:6},(_,i)=>{const col=i%3,row=Math.floor(i/3);return{x:w*col/3,y:h*row/2,w:w/3,h:h/2}});
+ return Array.from({length:6},(_,i)=>{const col=i%2,row=Math.floor(i/2);return{x:w*col/2,y:h*row/3,w:w/2,h:h/3}});
+}
+function cropWithMargin(im,b,m=.018){
+ const x=Math.max(0,b.x-b.w*m),y=Math.max(0,b.y-b.h*m),x2=Math.min(im.width,b.x+b.w*(1+m)),y2=Math.min(im.height,b.y+b.h*(1+m));
+ return cropData(im,x,y,x2-x,y2-y);
+}
+async function slotImageCandidates(im,b,chars){
+ const crops=[
+  cropWithMargin(im,b,.012),
+  cropData(im,b.x+b.w*.04,b.y+b.h*.02,b.w*.92,b.h*.94),
+  cropData(im,b.x+b.w*.10,b.y+b.h*.08,b.w*.80,b.h*.72)
+ ];
+ const allc=[];
+ for(const d of crops){try{allc.push(...await imageCandidates(d,chars))}catch{}}
+ const best={};for(const x of allc)if(!best[x.id]||best[x.id].score<x.score)best[x.id]=x.score;
+ return Object.entries(best).map(([id,score])=>{const c=chars.find(x=>x.id===id);return c?{...c,score}:null}).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,8);
+}
 async function analyze(file,partyId){
- const db=await openDB();const chars=await all(db,'characters');const src=await readImage(file);const im=await loadImg(src);
+ const db=await openDB();const chars=await all(db,'characters');db.close();
+ const src=await readImage(file),im=await loadImg(src);
  const w=im.naturalWidth||im.width,h=im.naturalHeight||im.height;
- const wideSix=w/h>=2.2;const landscape=w/h>=1.2;const cols=wideSix?6:(landscape?3:2),rows=wideSix?1:(landscape?2:3),gapX=wideSix?.006:.012,gapY=wideSix?.018:.012;
- const out=[];
+ // 写真全体を最初に解析し、6枠への分割は補助処理として行う
+ const full=await ocrFullImage(src);
+ const boxes=slotBoxes(w,h),out=[];
  for(let i=0;i<6;i++){
-   const col=i%cols,row=Math.floor(i/cols);
-   const x=w*(col/cols+gapX),y=h*(row/rows+gapY),cw=w*(1/cols-2*gapX),ch=h*(1/rows-2*gapY);
-   const data=cropData(im,x,y,cw,ch);
-   const text=await ocrText(data);
-   const matches=nameMatch(text,chars);
-   const visual=await imageCandidates(data,chars); const merged=[...matches,...visual].reduce((m,x)=>{const old=m.get(x.id);if(!old||x.score>old.score)m.set(x.id,x);return m},new Map()); const ranked=[...merged.values()].sort((a,b)=>b.score-a.score); const nm=ranked[0]||null; matches.splice(0,matches.length,...ranked.slice(0,5));
-   const awText=parseAwakeningText(text);
-   const aw=awText.value!==null?awText:(await visualAwakening(data)); const starVisual=aw.value===null?await detectStarVisual(data):aw;
-   const visualTop=visual[0]?.score||0; const visualBoost=Math.min(.15,visualTop*.15); const confidence=nm?.score?Math.min(1,(nm.score+visualBoost)*(aw.confidence||.7)):0;
-   out.push({position:i+1,crop:data,ocr:text,candidates:matches.slice(0,3),character_id:nm?.id||null,character_name:nm?.name||'',name_confidence:Math.min(1,(nm?.score||0)+visualBoost),visual_confidence:visualTop,awakening:starVisual.value,awakening_confidence:starVisual.confidence,awakening_source:starVisual.source,confidence});
+  const b=boxes[i],data=cropWithMargin(im,b,.012);
+  // 1枠につき「カード全体」「人物画像中心」「下部★領域」を別々に解析し、結果を統合
+  const nameRegions=[
+   cropData(im,b.x+b.w*.02,b.y+b.h*.02,b.w*.96,b.h*.96),
+   cropData(im,b.x+b.w*.08,b.y+b.h*.05,b.w*.84,b.h*.78)
+  ];
+  let text='';
+  for(const nr of nameRegions){const t=await ocrText(nr);if(t)text+='\\n'+t}
+  const matches=nameMatch(text,chars);
+  const visual=await slotImageCandidates(im,b,chars);
+  const merged=[...matches,...visual].reduce((m,x)=>{const old=m.get(x.id);if(!old||x.score>old.score)m.set(x.id,x);return m},new Map());
+  const ranked=[...merged.values()].sort((a,b)=>b.score-a.score),nm=ranked[0]||null;
+  const awText=parseAwakeningText(text+'\\n'+full.text);
+  const aw=awText.value!==null?awText:(await visualAwakening(data));
+  const starVisual=aw.value===null?await detectStarVisual(data):aw;
+  const visualTop=visual[0]?.score||0;
+  const visualBoost=Math.min(.18,visualTop*.18);
+  const nameConf=nm?.score?Math.min(1,nm.score+visualBoost):0;
+  out.push({
+   position:i+1,crop:data,ocr:text,full_ocr:full.text,
+   candidates:ranked.slice(0,5),character_id:nm?.id||null,character_name:nm?.name||'',
+   name_confidence:nameConf,visual_confidence:visualTop,
+   awakening:starVisual.value,awakening_confidence:starVisual.confidence,
+   awakening_source:starVisual.source,confidence:nameConf*(starVisual.confidence||.7)
+  });
  }
- return {version:VERSION,party_id:partyId,source_image:src,slots:out,created_at:new Date().toISOString()};
+ return {version:VERSION,party_id:partyId,source_image:src,full_ocr:full.text,slots:out,layout:{width:w,height:h,boxes},created_at:new Date().toISOString()};
 }
 async function apply(result,manual={}){
  const db=await openDB();const pcs=await all(db,'partyCharacters');const chars=await all(db,'characters');
