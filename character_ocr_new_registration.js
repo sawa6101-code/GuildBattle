@@ -69,24 +69,31 @@ async function ocrRegion(src,psm=7){await ensureOCR();try{const r=await Tesserac
 function cropNorm(im,x,y,w,h){return cropData(im,im.width*x,im.height*y,im.width*w,im.height*h)}
 function detectElementVisual(im){
  const c=document.createElement('canvas'),ctx=c.getContext('2d');
- const x=Math.round(im.width*.16),y=Math.round(im.height*.055),w=Math.round(im.width*.075),h=Math.round(im.height*.060);
- c.width=w;c.height=h;ctx.drawImage(im,x,y,w,h,0,0,w,h);
- const p=ctx.getImageData(0,0,w,h).data;let g=0,purp=0,yel=0;
- for(let i=0;i<p.length;i+=4){
-  const r=p[i],gg=p[i+1],b=p[i+2],mx=Math.max(r,gg,b),mn=Math.min(r,gg,b),d=mx-mn;
-  if(d<30||mx<70)continue;
-  const rr=r/255,gv=gg/255,bb=b/255;
-  const max=mx/255,min=mn/255,delta=max-min;
-  let hue=0;
-  if(delta){if(max===rr)hue=60*(((gv-bb)/delta)%6);else if(max===gv)hue=60*((bb-rr)/delta+2);else hue=60*((rr-gv)/delta+4);if(hue<0)hue+=360}
-  if(hue>=75&&hue<=165)g++;
-  else if(hue>=250&&hue<=330)purp++;
-  else if(hue>=35&&hue<=75&&r>120&&gg>100)yel++;
+ const regions=[
+  [.135,.045,.125,.090],
+  [.145,.040,.105,.105],
+  [.155,.050,.090,.080]
+ ];
+ const scores={光:0,闇:0,風:0};
+ for(const [rx,ry,rw,rh] of regions){
+  const x=Math.round(im.width*rx),y=Math.round(im.height*ry),w=Math.max(1,Math.round(im.width*rw)),h=Math.max(1,Math.round(im.height*rh));
+  c.width=w;c.height=h;ctx.clearRect(0,0,w,h);ctx.drawImage(im,x,y,w,h,0,0,w,h);
+  const p=ctx.getImageData(0,0,w,h).data;
+  let counts={光:0,闇:0,風:0};
+  for(let i=0;i<p.length;i+=4){
+   const r=p[i],g=p[i+1],b=p[i+2],mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;
+   if(mx<55||d<35)continue;
+   const max=mx/255,min=mn/255,delta=max-min;let hue=0;
+   if(delta){if(max===r/255)hue=60*(((g/255-b/255)/delta)%6);else if(max===g/255)hue=60*((b/255-r/255)/delta+2);else hue=60*((r/255-g/255)/delta+4);if(hue<0)hue+=360}
+   // 実画像の3属性アイコンを色相で分類：黄色=光、紫=闇、緑=風
+   if((hue>=35&&hue<75)&&r>120&&g>95)counts.光++;
+   else if(hue>=245&&hue<=335&&b>80)counts.闇++;
+   else if(hue>=75&&hue<170&&g>75)counts.風++;
+  }
+  for(const k of Object.keys(scores))scores[k]+=counts[k]/Math.max(1,p.length/4);
  }
- if(g>=purp&&g>=yel&&g>8)return '風';
- if(yel>=g&&yel>=purp&&yel>8)return '光';
- if(purp>=g&&purp>=yel&&purp>8)return '闇';
- return '';
+ const ranked=Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+ return ranked[0]&&ranked[0][1]>0.035?ranked[0][0]:'';
 }
 function cleanNameOCR(t){return lines(t).map(cleanLine).filter(x=>/[一-龯ぁ-んァ-ヶ]/.test(x)).sort((a,b)=>b.length-a.length)[0]||''}
 function levenshtein(a,b){a=norm(a);b=norm(b);const m=a.length,n=b.length,d=Array.from({length:m+1},()=>Array(n+1).fill(0));for(let i=0;i<=m;i++)d[i][0]=i;for(let j=0;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n]}
