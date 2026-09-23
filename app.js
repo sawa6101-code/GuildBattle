@@ -24,7 +24,7 @@ async function protectedDeleteMember(id,skipConfirm=false){
  if(!skipConfirm){const pw=prompt('削除を実行するにはパスワードを入力してください。');if(pw!=='4323'){alert('パスワードが正しくありません。削除しませんでした。');return false;}}
  const ps=(await all('parties')).filter(p=>p.member_id===id),pcs=await all('partyCharacters');
  for(const p of ps){for(const pc of pcs.filter(x=>x.party_id===p.id))await remove('partyCharacters',pc.id);await remove('parties',p.id);}
- await remove('members',id);return true;
+ await remove('members',id);await put('settings',{key:'deleted_member_'+id,member_id:id,name:label,deleted_at:now()});return true;
 }
 async function deleteMember(id){if(await protectedDeleteMember(id)){await refreshStats();await renderOwn();await renderGuilds();alert('メンバーを削除しました。')}}
 async function deleteGuild(id){
@@ -33,7 +33,7 @@ async function deleteGuild(id){
  if(!confirm(`敵ギルド「${g.name}」を削除しますか？\\n所属メンバー・PT・キャラクター配置も削除されます。`))return;
  const pw=prompt('削除を実行するにはパスワードを入力してください。');if(pw!=='4323')return alert('パスワードが正しくありません。削除しませんでした。');
  const ms=(await all('members')).filter(m=>m.guild_id===id);for(const m of ms)await protectedDeleteMember(m.id,true);
- await remove('guilds',id);await refreshStats();await renderGuilds();alert(`敵ギルド「${g.name}」を削除しました。`);
+ await remove('guilds',id);await put('settings',{key:'deleted_guild_'+id,guild_id:id,name:g.name,deleted_at:now()});await refreshStats();await renderGuilds();alert(`敵ギルド「${g.name}」を削除しました。`);
 }
 async function addOwnMember(){try{const g=await ensureOwn();let ms=(await all('members')).filter(m=>m.guild_id===g.id).sort((a,b)=>a.member_no-b.member_no);let m=ms.find(x=>!String(x.name||'').trim());if(!m){if(ms.length>=25)return alert('自軍は最大25人です。');m=await createMemberSlot(g.id,ms.length+1)}const name=prompt('プレイヤー名');if(name===null||!name.trim())return;const level=Number(prompt('Lv（不明なら0）','0'))||0;const power=Number((prompt('戦力（不明なら0）','0')||'0').replace(/,/g,''))||0;const points=Number((prompt('野望ポイント（不明なら0）','0')||'0').replace(/,/g,''))||0;m.name=name.trim();m.profile_level=level;m.battle_power=power;m.ambition_points=points;m.source='manual';m.updated_at=now();await put('members',m);await renderOwn();await refreshStats();alert(name.trim()+'を自軍に登録しました。PT1/PT2を編集できます。')}catch(err){console.error('addOwnMember error',err);alert('自軍メンバー追加に失敗しました。\n'+(err?.message||String(err)))}}
 async function addGuild(){const gs=(await all('guilds')).filter(g=>g.side==='ENEMY');if(gs.length>=16)return alert('敵ギルドは最大16ギルドです。');const name=prompt('ギルド名',`ギルド${String.fromCharCode(65+gs.length)}`);if(name===null)return;const no=gs.length+1;const g={id:uid('guild'),name:name.trim()||`ギルド${no}`,side:'ENEMY',guild_no:no,active:true,created_at:now(),updated_at:now()};await put('guilds',g);for(let i=1;i<=25;i++)await createMemberSlot(g.id,i);await renderGuilds();await refreshStats()}
