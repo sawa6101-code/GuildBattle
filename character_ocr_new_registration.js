@@ -70,9 +70,9 @@ function cropNorm(im,x,y,w,h){return cropData(im,im.width*x,im.height*y,im.width
 function detectElementVisual(im){
  const c=document.createElement('canvas'),ctx=c.getContext('2d');
  const regions=[
-  [.135,.045,.125,.090],
-  [.145,.040,.105,.105],
-  [.155,.050,.090,.080]
+  [.255,.090,.105,.075],
+  [.270,.082,.085,.090],
+  [.285,.095,.070,.065]
  ];
  const scores={光:0,闇:0,風:0};
  for(const [rx,ry,rw,rh] of regions){
@@ -164,7 +164,7 @@ async function analyze(file){
  const rarityCounts=rarityVotes.reduce((m,x)=>(m[x]=(m[x]||0)+1,m),{});
  let rarity=Object.entries(rarityCounts).sort((a,b)=>b[1]-a[1])[0]?.[0]||findRarity(rarityText);
  const role=findRole(roleText),mp=6;
- const element=detectElementVisual(im)||findElement(await ocrRegion(cropNorm(im,.16,.055,.075,.065),6));
+ const element=detectElementVisual(im)||findElement(await ocrRegion(cropNorm(im,.255,.090,.105,.075),6));
  const skills=parseSkills(skillText);
  const existing=bestExisting(name,title,chars);
  if(existing?.rarity&&['SSR','SR','R'].includes(existing.rarity))rarity=existing.rarity;
