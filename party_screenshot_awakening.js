@@ -18,11 +18,18 @@ function cropData(im,x,y,w,h){const c=document.createElement('canvas');c.width=M
 function levenshtein(a,b){a=norm(a);b=norm(b);if(!a||!b)return 0;const d=Array.from({length:a.length+1},(_,i)=>i);for(let j=1;j<=b.length;j++){let prev=d[0];d[0]=j;for(let i=1;i<=a.length;i++){const old=d[i];d[i]=Math.min(d[i]+1,d[i-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=old}}return 1-d[a.length]/Math.max(a.length,b.length)}
 function imageFeature(data){
  return loadImg(data).then(im=>{
-  const c=document.createElement('canvas'),w=16,h=16;c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);
-  const p=c.getContext('2d').getImageData(0,0,w,h).data,v=[];for(let i=0;i<p.length;i+=4){v.push(Math.round(p[i]/32)/8,Math.round(p[i+1]/32)/8,Math.round(p[i+2]/32)/8)}return v;
+  const c=document.createElement('canvas'),w=32,h=32;c.width=w;c.height=h;
+  const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(im,0,0,w,h);
+  const p=ctx.getImageData(0,0,w,h).data,v=[];
+  for(let i=0;i<p.length;i+=4)v.push(Math.round(p[i]/16),Math.round(p[i+1]/16),Math.round(p[i+2]/16));
+  return v;
  });
 }
-function featureSimilarity(a,b){if(!a||!b||a.length!==b.length)return 0;let d=0;for(let i=0;i<a.length;i++){const x=a[i]-b[i];d+=x*x}return Math.max(0,1-Math.sqrt(d/a.length)*2)}
+function featureSimilarity(a,b){
+ if(!a||!b||a.length!==b.length)return 0;
+ let e=0;for(let i=0;i<a.length;i++)e+=Math.abs(a[i]-b[i]);
+ return Math.max(0,1-e/(a.length*15));
+}
 function normalizeRarity(v){
  const t=String(v||'').toUpperCase().replace(/Ｓ/g,'S').replace(/Ｒ/g,'R');
  if(/SSR/.test(t))return 'SSR';if(/(^|[^S])SR([^R]|$)/.test(t))return 'SR';if(/(^|[^S])R([^R]|$)/.test(t))return 'R';return '';
@@ -243,7 +250,7 @@ function renderResult(r){
  box.innerHTML='<h4>認識結果</h4>'+r.slots.map(s=>{
   const icon=s.rarity&&s.element&&s.name_confidence>=.9&&s.awakening_confidence>=.9?'🟢':s.rarity||s.element?'🟡':'🔴';
   const opts=(s.candidates||[]).map(c=>'<option value="'+esc(c.id)+'" '+(c.id===s.character_id?'selected':'')+'>'+esc(c.name)+' ['+esc(c.id)+']</option>').join('');
-  return '<div class="card" data-psa-pos="'+s.position+'"><b>'+icon+' 枠'+s.position+'</b><div>絞り込み: '+esc(s.rarity||'未判定')+' / '+esc(s.element||'未判定')+' → 候補'+s.candidate_count+'体 → 画像照合'+(s.image_match_auto?' → 🟢画像だけで高信頼確定':'')+'</div><div>枠OCR: '+esc((s.ocr||'').slice(0,100))+'</div><label>キャラクター<select class="psaChar">'+opts+'</select></label><label>現在の凸<select class="psaAw">'+[0,1,2,3,4].map(n=>'<option value="'+n+'" '+(s.awakening===n?'selected':'')+'>★'+n+'</option>').join('')+'</select></label><small>画像参照あり / キャラ信頼度 '+Math.round(s.name_confidence*100)+'% / 凸認識 '+(s.awakening===null?'未認識':Math.round(s.awakening_confidence*100)+'%')+' / '+esc(s.awakening_source)+'</small></div>'
+  return '<div class="card" data-psa-pos="'+s.position+'"><b>'+icon+' 枠'+s.position+'</b><div>絞り込み: '+esc(s.rarity||'未判定')+' / '+esc(s.element||'未判定')+' → 候補'+s.candidate_count+'体 → 画像照合'+(s.image_match_auto?' → 🟢画像だけで高信頼確定':'')+'</div><div>枠OCR: '+esc((s.ocr||'').slice(0,100))+'</div><label>キャラクター<select class="psaChar">'+opts+'</select></label><label>現在の凸<select class="psaAw">'+[0,1,2,3,4].map(n=>'<option value="'+n+'" '+(s.awakening===n?'selected':'')+'>★'+n+'</option>').join('')+'</select></label><small>'+(s.image_reference_id?'画像参照あり':'画像参照なし')+' / キャラ信頼度 '+Math.round(s.name_confidence*100)+'% / 凸認識 '+(s.awakening===null?'未認識':Math.round(s.awakening_confidence*100)+'%')+' / '+esc(s.awakening_source)+'</small></div>'
  }).join('')+'<button type="button" class="wide primary" id="psaApply">✅ この6枠をPTへ確定</button>';
  $('#psaApply').onclick=async()=>{const manual={};box.querySelectorAll('[data-psa-pos]').forEach(el=>{manual[Number(el.dataset.psaPos)]={character_id:el.querySelector('.psaChar')?.value||null,awakening:Number(el.querySelector('.psaAw')?.value||0)}});try{const n=await apply(r,manual);alert(n+'枠をPTへ反映しました。');if(typeof openMember==='function')openMember(window.__guildBattleCurrentMemberId,window.memberReturnView||'own')}catch(e){alert('反映に失敗しました: '+e.message)}};
 }
