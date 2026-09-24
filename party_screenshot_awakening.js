@@ -6,7 +6,7 @@
 (function(){
 'use strict';
 const DB='paranoise-guildbattle';
-const VERSION='4.0.0';
+const VERSION='4.1.0';
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const norm=s=>String(s??'').normalize('NFKC').replace(/[\s　]+/g,'').toLowerCase();
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
@@ -64,11 +64,11 @@ async function imageCandidates(data,chars,candidateIds){
  const db=await openDB();let imgs=[];try{imgs=await all(db,'characterImages')}catch{}db.close();
  const allowed=candidateIds?new Set(candidateIds):null,q=await imageFeature(data),out=[];
  for(const im of imgs){
-  if(!im.character_id||!im.blob||(allowed&&!allowed.has(im.character_id)))continue;
-  try{const f=await imageFeature(im.blob),s=featureSimilarity(q,f);if(s>0)out.push({id:im.character_id,score:s})}catch{}
+  if(im.verified===false||!im.character_id||!im.blob||(allowed&&!allowed.has(im.character_id)))continue;
+  try{const f=await imageFeature(im.blob),s=featureSimilarity(q,f);if(s>0)out.push({id:im.character_id,score:s,reference_id:im.id,reference_name:im.reference_name||'',reference_title:im.reference_title||''})}catch{}
  }
- const best={};for(const x of out)if(!best[x.id]||best[x.id].score<x.score)best[x.id]=x.score;
- return Object.entries(best).map(([id,score])=>{const c=chars.find(x=>x.id===id);return c?{...c,score}:null}).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,8);
+ const best={};for(const x of out)if(!best[x.id]||best[x.id].score<x.score)best[x.id]=x;
+ return Object.values(best).map(x=>{const c=chars.find(v=>v.id===x.id);return c?{...c,score:x.score,reference_id:x.reference_id,reference_name:x.reference_name,reference_title:x.reference_title}:null}).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,8);
 }
 function nameMatch(text,chars){
  const t=norm(text);
@@ -171,19 +171,19 @@ async function analyze(file,partyId){
   for(const nr of nameRegions){const t=await ocrText(nr);if(t)text+='\n'+t}
   const matches=nameMatch(text,filtered);
   const merged=[...matches,...visual].reduce((m,x)=>{const old=m.get(x.id);if(!old||x.score>old.score)m.set(x.id,x);return m},new Map());
-  const ranked=[...merged.values()].sort((x,y)=>y.score-x.score),nm=ranked[0]||null;
+  const ranked=[...merged.values()].sort((x,y)=>y.score-x.score); const visualSecond=visual[1]?.score||0; const visualAuto=!!visual[0]&&visual[0].score>=.86&&visual[0].score-visualSecond>=.045&&visual[0].reference_id; const nm=visualAuto?visual[0]:(ranked[0]||null);
   const awText=parseAwakeningText(text);
   const aw=awText.value!==null?awText:(await visualAwakening(data));
   const starVisual=aw.value===null?await detectStarVisual(data):aw;
   const visualTop=visual[0]?.score||0;
-  const nameConf=nm?.score?Math.min(1,nm.score+Math.min(.18,visualTop*.18)):0;
+  const nameConf=nm?.score?(visualAuto?Math.min(1,visualTop+.08):Math.min(1,nm.score+Math.min(.18,visualTop*.18))):0;
   const rarityElementBonus=(rarity.value&&element.value)?0.06:0;
   out.push({
    position:i+1,crop:data,ocr:text,full_ocr:full.text,
    rarity:rarity.value,rarity_confidence:rarity.confidence,rarity_source:rarity.source,
    element:element.value,element_confidence:element.confidence,element_source:element.source,
    candidate_count:filtered.length,
-   candidates:ranked.slice(0,5),character_id:nm?.id||null,character_name:nm?.name||'',
+   candidates:ranked.slice(0,5),character_id:nm?.id||null,character_name:nm?.name||'',image_reference_id:nm?.reference_id||null,image_match_auto:!!visualAuto,
    name_confidence:Math.min(1,nameConf+rarityElementBonus),visual_confidence:visualTop,
    awakening:starVisual.value,awakening_confidence:starVisual.confidence,
    awakening_source:starVisual.source,confidence:Math.min(1,(nameConf+rarityElementBonus)*(starVisual.confidence||.7))
@@ -243,7 +243,7 @@ function renderResult(r){
  box.innerHTML='<h4>認識結果</h4>'+r.slots.map(s=>{
   const icon=s.rarity&&s.element&&s.name_confidence>=.9&&s.awakening_confidence>=.9?'🟢':s.rarity||s.element?'🟡':'🔴';
   const opts=(s.candidates||[]).map(c=>'<option value="'+esc(c.id)+'" '+(c.id===s.character_id?'selected':'')+'>'+esc(c.name)+' ['+esc(c.id)+']</option>').join('');
-  return '<div class="card" data-psa-pos="'+s.position+'"><b>'+icon+' 枠'+s.position+'</b><div>絞り込み: '+esc(s.rarity||'未判定')+' / '+esc(s.element||'未判定')+' → 候補'+s.candidate_count+'体 → 画像照合</div><div>枠OCR: '+esc((s.ocr||'').slice(0,100))+'</div><label>キャラクター<select class="psaChar">'+opts+'</select></label><label>現在の凸<select class="psaAw">'+[0,1,2,3,4].map(n=>'<option value="'+n+'" '+(s.awakening===n?'selected':'')+'>★'+n+'</option>').join('')+'</select></label><small>キャラ信頼度 '+Math.round(s.name_confidence*100)+'% / 凸認識 '+(s.awakening===null?'未認識':Math.round(s.awakening_confidence*100)+'%')+' / '+esc(s.awakening_source)+'</small></div>'
+  return '<div class="card" data-psa-pos="'+s.position+'"><b>'+icon+' 枠'+s.position+'</b><div>絞り込み: '+esc(s.rarity||'未判定')+' / '+esc(s.element||'未判定')+' → 候補'+s.candidate_count+'体 → 画像照合'+(s.image_match_auto?' → 🟢画像だけで高信頼確定':'')+'</div><div>枠OCR: '+esc((s.ocr||'').slice(0,100))+'</div><label>キャラクター<select class="psaChar">'+opts+'</select></label><label>現在の凸<select class="psaAw">'+[0,1,2,3,4].map(n=>'<option value="'+n+'" '+(s.awakening===n?'selected':'')+'>★'+n+'</option>').join('')+'</select></label><small>画像参照あり / キャラ信頼度 '+Math.round(s.name_confidence*100)+'% / 凸認識 '+(s.awakening===null?'未認識':Math.round(s.awakening_confidence*100)+'%')+' / '+esc(s.awakening_source)+'</small></div>'
  }).join('')+'<button type="button" class="wide primary" id="psaApply">✅ この6枠をPTへ確定</button>';
  $('#psaApply').onclick=async()=>{const manual={};box.querySelectorAll('[data-psa-pos]').forEach(el=>{manual[Number(el.dataset.psaPos)]={character_id:el.querySelector('.psaChar')?.value||null,awakening:Number(el.querySelector('.psaAw')?.value||0)}});try{const n=await apply(r,manual);alert(n+'枠をPTへ反映しました。');if(typeof openMember==='function')openMember(window.__guildBattleCurrentMemberId,window.memberReturnView||'own')}catch(e){alert('反映に失敗しました: '+e.message)}};
 }
