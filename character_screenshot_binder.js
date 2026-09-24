@@ -102,11 +102,11 @@ function candidateRows(chars,refs,name,features,ocrText=''){
  return chars.map(c=>{
   const p=parts(c);
   const full=input&&input===p.full?1:0;
-  const base=input&&input===p.base?.98:0;
-  const title=input&&p.title&&input===p.title?.96:0;
+  const base=(input&&input===p.base)?.98:0;
+  const title=(input&&p.title&&input===p.title)?.96:0;
   const fullIn=raw.includes(p.full)?1:0;
-  const baseIn=raw.includes(p.base)&&p.base.length>=3?.92:0;
-  const titleIn=raw.includes(p.title)&&p.title.length>=3?.94:0;
+  const baseIn=(raw.includes(p.base)&&p.base.length>=3)?.92:0;
+  const titleIn=(raw.includes(p.title)&&p.title.length>=3)?.94:0;
   const fuzzyName=Math.max(full,base,title,fullIn,baseIn,titleIn,
     input&&p.base?Math.max(0,1-editRatio(input,p.base))*.72:0,
     input&&p.title?Math.max(0,1-editRatio(input,p.title))*.70:0);
