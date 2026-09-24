@@ -202,11 +202,13 @@ async function apply(result,manual={}){
  const db=await openDB();const pcs=await all(db,'partyCharacters');const chars=await all(db,'characters');
  let saved=0;
  for(const s of result.slots){
-   const choice=manual[s.position]||{};const cid=choice.character_id||s.character_id;const aw=choice.awakening!==undefined?Number(choice.awakening):s.awakening;
+   const choice=manual[s.position]||{};const cid=choice.character_id||s.character_id;
    if(!cid)continue;
    let pc=pcs.find(x=>x.party_id===result.party_id&&Number(x.position)===s.position);
    if(!pc)pc={id:'pc_'+crypto.randomUUID(),party_id:result.party_id,position:s.position};
-   pc.character_id=cid;pc.character_name=chars.find(c=>c.id===cid)?.name||s.character_name||'';pc.awakening=(Number.isFinite(aw)?Math.max(0,Math.min(4,aw)):0);pc.match_status=choice.character_id?'CONFIRMED':'SCREENSHOT_CONFIRMED';pc.match_stage=5;pc.match_confidence=Math.max(s.name_confidence||0,s.confidence||0);pc.awakening_confidence=choice.awakening!==undefined?1:(s.awakening_confidence||0);pc.awakening_source=choice.awakening!==undefined?'manual':s.awakening_source;pc.awakening_detected_at=new Date().toISOString();await put(db,'partyCharacters',pc);saved++;
+   const aw=choice.awakening!==undefined?Number(choice.awakening):s.awakening;
+   const preservedAwakening=Number.isFinite(pc.awakening)?Number(pc.awakening):0;
+   pc.character_id=cid;pc.character_name=chars.find(c=>c.id===cid)?.name||s.character_name||'';pc.awakening=(Number.isFinite(aw)?Math.max(0,Math.min(4,aw)):preservedAwakening);pc.match_status=choice.character_id?'CONFIRMED':'SCREENSHOT_CONFIRMED';pc.match_stage=5;pc.match_confidence=Math.max(s.name_confidence||0,s.confidence||0);pc.awakening_confidence=choice.awakening!==undefined?1:(s.awakening_confidence||0);pc.awakening_source=choice.awakening!==undefined?'manual':s.awakening_source;pc.awakening_detected_at=new Date().toISOString();await put(db,'partyCharacters',pc);saved++;
  }
  return saved;
 }
@@ -243,7 +245,7 @@ function install(){
  const box=document.createElement('div');box.id='partyShotAwake';box.className='card';box.innerHTML='<h3>📷 PTスクショ → 6枠＋現在の凸数を自動設定</h3><p class="hint">PT編成画面全体を読み込み、①レアリティ→②属性→③キャラクター画像→④名前OCRの順に候補を絞り込み、最後に★0～★4（凸数）を判定します。</p><label>対象PT<select id="psaParty"></select></label><input id="psaFile" type="file" accept="image/*"><button type="button" class="wide primary" id="psaAnalyze">🔍 6枠＋凸数を自動認識</button><div id="psaStatus" class="hint"></div><div id="psaResults"></div>';
  host.prepend(box);
  refreshTargetParties();
- $('#psaAnalyze').onclick=async()=>{const f=$('#psaFile')?.files?.[0],pid=$('#psaParty')?.value;if(!f||!pid)return alert('対象PTとスクショを指定してください。');$('#psaStatus').textContent='解析中…（写真全体OCR＋6枠画像照合＋凸数認識）';try{const r=await analyze(f,pid);window.__partyScreenshotAwakeningLast=r;const auto={};let autoCount=0;r.slots.forEach(s=>{if(s.character_id&&s.name_confidence>=.9&&s.awakening!==null&&s.awakening_confidence>=.9){auto[s.position]={character_id:s.character_id,awakening:s.awakening};autoCount++}});if(autoCount)await apply(r,auto);renderResult(r);$('#psaStatus').textContent='解析完了。🟢高信頼 '+autoCount+'枠は自動反映済み。🟡/🔴は下の結果を確認して確定してください。'}catch(e){console.error(e);$('#psaStatus').textContent='解析エラー: '+e.message}};
+ $('#psaAnalyze').onclick=async()=>{const f=$('#psaFile')?.files?.[0],pid=$('#psaParty')?.value;if(!f||!pid)return alert('対象PTとスクショを指定してください。');$('#psaStatus').textContent='解析中…（写真全体OCR＋6枠画像照合＋凸数認識）';try{const r=await analyze(f,pid);window.__partyScreenshotAwakeningLast=r;const auto={};let autoCount=0;r.slots.forEach(s=>{if(s.character_id&&s.name_confidence>=.9){auto[s.position]={character_id:s.character_id};if(s.awakening!==null&&s.awakening_confidence>=.9)auto[s.position].awakening=s.awakening;autoCount++}});if(autoCount)await apply(r,auto);renderResult(r);$('#psaStatus').textContent='解析完了。🟢高信頼 '+autoCount+'枠は自動反映済み。🟡/🔴は下の結果を確認して確定してください。'}catch(e){console.error(e);$('#psaStatus').textContent='解析エラー: '+e.message}};
 };
 function renderResult(r){
  const box=$('#psaResults');if(!box)return;
