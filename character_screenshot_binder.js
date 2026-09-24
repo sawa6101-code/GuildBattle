@@ -85,15 +85,40 @@ function bestImage(refs,features,characterId){
  }
  return {score:best,referenceId,count:rs.length};
 }
-function candidateRows(chars,refs,name,features){
+function editRatio(a,b){
+ a=norm(a);b=norm(b);if(!a||!b)return 1;
+ const m=a.length,n=b.length,d=Array.from({length:m+1},()=>Array(n+1).fill(0));
+ for(let i=0;i<=m;i++)d[i][0]=i;
+ for(let j=0;j<=n;j++)d[0][j]=j;
+ for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+ return d[m][n]/Math.max(m,n);
+}
+function parts(c){
+ const m=String(c.name||'').match(/^(.*?)[（(](.*)[）)]$/);
+ return {base:norm(m?m[1]:c.name),title:norm(m?m[2]:(c.title||'')),full:norm(c.name)};
+}
+function candidateRows(chars,refs,name,features,ocrText=''){
+ const raw=norm(ocrText), input=norm(name);
  return chars.map(c=>{
-  const exact=norm(name)===norm(c.name)?1:0;
-  const fuzzy=exact?1:0;
-  const im=bestImage(refs,features,c.id);
-  const image=im.score;
-  const score=Math.max(exact,image*.95);
-  return {id:c.id,name:c.name,rarity:c.rarity,exact,image,reference_id:im.referenceId,reference_count:im.count,score};
- }).sort((a,b)=>b.score-a.score);
+  const p=parts(c);
+  const full=input&&input===p.full?1:0;
+  const base=input&&input===p.base?.98:0;
+  const title=input&&p.title&&input===p.title?.96:0;
+  const fullIn=raw.includes(p.full)?1:0;
+  const baseIn=raw.includes(p.base)&&p.base.length>=3?.92:0;
+  const titleIn=raw.includes(p.title)&&p.title.length>=3?.94:0;
+  const fuzzyName=Math.max(full,base,title,fullIn,baseIn,titleIn,
+    input&&p.base?Math.max(0,1-editRatio(input,p.base))*.72:0,
+    input&&p.title?Math.max(0,1-editRatio(input,p.title))*.70:0);
+  const im=bestImage(refs,features,c.id),image=im.score;
+  const score=Math.max(fuzzyName,image*.95);
+  return {id:c.id,name:c.name,rarity:c.rarity,exact:full,image,reference_id:im.referenceId,reference_count:im.count,score,name_score:fuzzyName};
+ }).sort((a,b)=>b.score-a.score||b.name_score-a.name_score);
+}
+function renderCandidateList(rows,query=''){
+ const q=norm(query);
+ const filtered=q?rows.filter(x=>norm(x.id).includes(q)||norm(x.name).includes(q)||norm(parts({name:x.name}).base).includes(q)||norm(parts({name:x.name}).title).includes(q)):rows;
+ return filtered.slice(0,50).map((x,i)=>'<label style="display:block;margin:.35rem 0"><input type="radio" name="csCandidate" value="'+esc(x.id)+'"> '+(i===0&&!q?'⭐ ':'')+esc(x.id)+' '+esc(x.name)+' / 名前 '+Math.round(x.name_score*100)+'% / 画像 '+Math.round(x.image*100)+'% / 参照'+x.reference_count+'件 / 総合 '+Math.round(x.score*100)+'%</label>').join('')||'<p class="hint">該当候補なし。ID・キャラクター名・種別で検索できます。</p>';
 }
 async function analyze(){
  const cf=$('#csCharFile')?.files?.[0], sf=[...($('#csSkillFile')?.files||[])];
@@ -101,7 +126,7 @@ async function analyze(){
  const out=$('#csResult'), skillOut=$('#csSkillResult');out.textContent='画像・OCRを解析中…';skillOut.textContent='';
  const d=await openDB(),chars=await all(d,'characters'),refs=await all(d,'characterImages');d.close();
  const blob=await fileData(cf),features=await imageFeatures(blob),text=await ocr(blob),name=extractName(text,chars);
- const rows=candidateRows(chars,refs,name,features),top=rows[0],second=rows[1];
+ const rows=candidateRows(chars,refs,name,features,text),top=rows[0],second=rows[1];
  const margin=(top?.score||0)-(second?.score||0);
  const auto=!!top&&((top.exact===1&&margin>=.12)||(top.image>=.90&&top.reference_count>0&&margin>=.06));
  const skillRecords=[];
@@ -111,9 +136,12 @@ async function analyze(){
   match_stage:auto?5:4,match_confidence:top?.score||0,ocr_text:text,filename:cf.name,
   blob,features,skill_screenshot_count:sf.length,created_at:new Date().toISOString()};
  window.__csCtx={chars,refs,rec,features,skills,skillRecords};
- out.innerHTML='<div class="notice"><b>OCR:</b> '+esc(name||'未検出')+'<br><b>内部判定:</b> '+(auto?'🟢 自動確定':'🟡 候補・手動確認')+'</div>'+
-  '<div class="match-candidates">'+rows.slice(0,8).map((x,i)=>'<label style="display:block;margin:.35rem 0"><input type="radio" name="csCandidate" value="'+esc(x.id)+'" '+(i===0?'checked':'')+'> '+(i===0?'⭐ ':'')+esc(x.id)+' '+esc(x.name)+' / OCR '+Math.round(x.exact*100)+'% / 画像 '+Math.round(x.image*100)+'% / 参照'+x.reference_count+'件 / 総合 '+Math.round(x.score*100)+'%</label>').join('')+'</div>'+
+ out.innerHTML='<div class="notice"><b>OCR:</b> '+esc(name||'未検出')+'<br><b>内部判定:</b> '+(auto?'🟢 自動確定':'🟡 候補・手動確認')+'<br><span class="hint">登録済みIDをOCRだけで見つけられない場合に備え、種別・タイトル一致、あいまい一致、画像参照を総合して候補化しています。</span></div>'+
+  '<label>候補検索（ID・キャラクター名・種別）<input id="csCandidateSearch" type="search" placeholder="例：その視線の先に / 橘結衣 / CHR-"></label>'+
+  '<div class="match-candidates" id="csCandidateRows">'+renderCandidateList(rows)+'</div>'+
+  '<p class="hint" id="csCandidateCount">'+rows.length+'件の登録キャラクターを検索可能</p>'+
   '<p class="hint">🟢 自動確定条件を満たした場合も、選択中のIDを変更して手動修正できます。</p><button class="wide primary" id="csConfirm">✅ このIDで確定して登録</button>';
+ $('#csCandidateSearch').oninput=e=>{$('#csCandidateRows').innerHTML=renderCandidateList(rows,e.target.value);const first=document.querySelector('input[name="csCandidate"]');if(first)first.checked=true;};
  skillOut.innerHTML=skills.length?'<div class="notice"><b>🧩 スキル解析 '+skills.length+'件</b><br>'+skills.map(s=>'・'+esc(s.name)+' / '+esc(s.target||'—')+' / '+(s.multiplier??'—')+'x / '+(s.tu??'—')+'TU / '+esc(s.status_effects.join(','))).join('<br>')+'</div>':'<p class="hint">スキルスクショから解析できたスキルはありません。画像を追加して再解析できます。</p>';
  $('#csConfirm').onclick=confirmRegistration;
 }
