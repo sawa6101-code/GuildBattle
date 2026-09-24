@@ -77,18 +77,22 @@ function parseSkills(text){
  return out;
 }
 function bestImage(refs,features,characterId){
- const rs=refs.filter(x=>x.character_id===characterId&&Array.isArray(x.features));
- let best=0;
- for(const r of rs)for(const a of features)for(const b of r.features)best=Math.max(best,visual(a.vector,b.vector));
- return best;
+ const rs=refs.filter(x=>x.character_id===characterId&&x.verified!==false&&Array.isArray(x.features));
+ let best=0,referenceId=null;
+ for(const r of rs)for(const a of features)for(const b of r.features){
+  const s=visual(a.vector,b.vector);
+  if(s>best){best=s;referenceId=r.id;}
+ }
+ return {score:best,referenceId,count:rs.length};
 }
 function candidateRows(chars,refs,name,features){
  return chars.map(c=>{
   const exact=norm(name)===norm(c.name)?1:0;
   const fuzzy=exact?1:0;
-  const image=bestImage(refs,features,c.id);
+  const im=bestImage(refs,features,c.id);
+  const image=im.score;
   const score=Math.max(exact,image*.95);
-  return {id:c.id,name:c.name,rarity:c.rarity,exact,image,score};
+  return {id:c.id,name:c.name,rarity:c.rarity,exact,image,reference_id:im.referenceId,reference_count:im.count,score};
  }).sort((a,b)=>b.score-a.score);
 }
 async function analyze(){
@@ -99,7 +103,7 @@ async function analyze(){
  const blob=await fileData(cf),features=await imageFeatures(blob),text=await ocr(blob),name=extractName(text,chars);
  const rows=candidateRows(chars,refs,name,features),top=rows[0],second=rows[1];
  const margin=(top?.score||0)-(second?.score||0);
- const auto=!!top&&((top.exact===1&&margin>=.12)||(top.image>=.94&&margin>=.08));
+ const auto=!!top&&((top.exact===1&&margin>=.12)||(top.image>=.90&&top.reference_count>0&&margin>=.06));
  const skillRecords=[];
  for(const f of sf){const z=await fileData(f),st=await ocr(z);skillRecords.push({filename:f.name,blob:z,ocr_text:st,skills:parseSkills(st)})}
  const skills=skillRecords.flatMap(x=>x.skills);
@@ -108,7 +112,7 @@ async function analyze(){
   blob,features,skill_screenshot_count:sf.length,created_at:new Date().toISOString()};
  window.__csCtx={chars,refs,rec,features,skills,skillRecords};
  out.innerHTML='<div class="notice"><b>OCR:</b> '+esc(name||'未検出')+'<br><b>内部判定:</b> '+(auto?'🟢 自動確定':'🟡 候補・手動確認')+'</div>'+
-  '<div class="match-candidates">'+rows.slice(0,8).map((x,i)=>'<label style="display:block;margin:.35rem 0"><input type="radio" name="csCandidate" value="'+esc(x.id)+'" '+(i===0?'checked':'')+'> '+(i===0?'⭐ ':'')+esc(x.id)+' '+esc(x.name)+' / OCR '+Math.round(x.exact*100)+'% / 画像 '+Math.round(x.image*100)+'% / 総合 '+Math.round(x.score*100)+'%</label>').join('')+'</div>'+
+  '<div class="match-candidates">'+rows.slice(0,8).map((x,i)=>'<label style="display:block;margin:.35rem 0"><input type="radio" name="csCandidate" value="'+esc(x.id)+'" '+(i===0?'checked':'')+'> '+(i===0?'⭐ ':'')+esc(x.id)+' '+esc(x.name)+' / OCR '+Math.round(x.exact*100)+'% / 画像 '+Math.round(x.image*100)+'% / 参照'+x.reference_count+'件 / 総合 '+Math.round(x.score*100)+'%</label>').join('')+'</div>'+
   '<p class="hint">🟢 自動確定条件を満たした場合も、選択中のIDを変更して手動修正できます。</p><button class="wide primary" id="csConfirm">✅ このIDで確定して登録</button>';
  skillOut.innerHTML=skills.length?'<div class="notice"><b>🧩 スキル解析 '+skills.length+'件</b><br>'+skills.map(s=>'・'+esc(s.name)+' / '+esc(s.target||'—')+' / '+(s.multiplier??'—')+'x / '+(s.tu??'—')+'TU / '+esc(s.status_effects.join(','))).join('<br>')+'</div>':'<p class="hint">スキルスクショから解析できたスキルはありません。画像を追加して再解析できます。</p>';
  $('#csConfirm').onclick=confirmRegistration;
@@ -121,7 +125,7 @@ async function confirmRegistration(){
  const d=await openDB(),ts=new Date().toISOString();
  ctx.rec.character_id=selected;ctx.rec.match_status='CONFIRMED';ctx.rec.match_stage=5;ctx.rec.match_confidence=1;ctx.rec.confirmed_at=ts;
  await put(d,'characterScreenshots',ctx.rec);
- await put(d,'characterImages',{id:'img_'+crypto.randomUUID(),character_id:selected,image_type:'card',blob:ctx.blob,features:ctx.features,verified:true,verification_source:'user_confirmed',created_at:ts});
+ await put(d,'characterImages',{id:'img_'+crypto.randomUUID(),character_id:selected,image_type:'card',blob:ctx.blob,features:ctx.features,verified:true,reference_scope:'character_variant',reference_name:c.name,reference_title:c.title||'',feature_version:'binder-v3',verification_source:'user_confirmed',created_at:ts});
  if(ctx.skills.length){
   const old=Array.isArray(c.skill_data?.skills)?c.skill_data.skills:[];
   const merged=[...old];
@@ -146,7 +150,7 @@ function install(){
  sec.querySelector('.section-head')?.appendChild(b);
  const box=document.createElement('div');box.id='characterScreenshotBinder';box.className='card hidden';
  box.innerHTML='<h3>📷 キャラクター／スキル スクショ登録</h3>'+
- '<p class="hint">①キャラクターページを添付 → ②OCR＋既登録画像で内部判定 → ③正しければそのID、違えば正しいIDを選択 → ④確定。スキル掲載ページも複数添付すると、確定したキャラクターへスキル・倍率・TU・状態異常・条件を紐付けます。</p>'+
+ '<p class="hint">①キャラクタースクショを添付 → ②OCR＋登録済みのキャラクター別画像参照で内部判定 → ③画像一致が高信頼ならOCRなしでもIDを自動確定 → ④必要なら正しいIDを選択して確定。スキル掲載ページも複数添付すると、確定したキャラクターへスキル・倍率・TU・状態異常・条件を紐付けます。</p>'+
  '<label>キャラクタースクショ<input id="csCharFile" type="file" accept="image/*"></label>'+
  '<label>スキル掲載スクショ（複数可）<input id="csSkillFile" type="file" accept="image/*" multiple></label>'+
  '<button class="wide primary" id="csAnalyze">🔍 内部判定</button><div id="csResult"></div><div id="csSkillResult"></div>';
