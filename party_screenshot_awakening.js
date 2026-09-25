@@ -16,13 +16,18 @@ function readImage(file){return new Promise((res,rej)=>{const fr=new FileReader(
 function loadImg(src){return new Promise((res,rej)=>{const im=new Image();let u=null;im.onload=()=>{if(u)URL.revokeObjectURL(u);res(im)};im.onerror=()=>{if(u)URL.revokeObjectURL(u);rej(new Error('画像を読み込めません'))};if(src instanceof Blob){u=URL.createObjectURL(src);im.src=u}else im.src=src})}
 function cropData(im,x,y,w,h){const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w));c.height=Math.max(1,Math.round(h));c.getContext('2d').drawImage(im,x,y,w,h,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.88)}
 function levenshtein(a,b){a=norm(a);b=norm(b);if(!a||!b)return 0;const d=Array.from({length:a.length+1},(_,i)=>i);for(let j=1;j<=b.length;j++){let prev=d[0];d[0]=j;for(let i=1;i<=a.length;i++){const old=d[i];d[i]=Math.min(d[i]+1,d[i-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=old}}return 1-d[a.length]/Math.max(a.length,b.length)}
-function imageFeature(data){
+function imageFeatures(data){
  return loadImg(data).then(im=>{
-  const c=document.createElement('canvas'),w=32,h=32;c.width=w;c.height=h;
-  const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(im,0,0,w,h);
-  const p=ctx.getImageData(0,0,w,h).data,v=[];
-  for(let i=0;i<p.length;i+=4)v.push(Math.round(p[i]/16),Math.round(p[i+1]/16),Math.round(p[i+2]/16));
-  return v;
+  const out=[];
+  const crops=[[0,0,1,1,'full'],[0,0,.6,.7,'top-left'],[.2,0,.8,.8,'top-center'],[.4,0,.6,.8,'top-right'],[0,.15,1,.7,'center']];
+  for(const [px,py,pw,ph,label] of crops){
+   const c=document.createElement('canvas');c.width=c.height=32;
+   const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(im,im.width*px,im.height*py,im.width*pw,im.height*ph,0,0,32,32);
+   const p=ctx.getImageData(0,0,32,32).data,v=[];
+   for(let i=0;i<p.length;i+=4)v.push(Math.round(p[i]/16),Math.round(p[i+1]/16),Math.round(p[i+2]/16));
+   out.push({label,vector:v});
+  }
+  return out;
  });
 }
 function featureSimilarity(a,b){
@@ -64,7 +69,7 @@ async function detectElement(data){
 }
 async function imageCandidates(data,chars,candidateIds){
  const db=await openDB();let imgs=[];try{imgs=await all(db,'characterImages')}catch{}db.close();
- const allowed=candidateIds?new Set(candidateIds):null,q=await imageFeature(data),out=[];
+ const allowed=candidateIds?new Set(candidateIds):null,q=await imageFeatures(data),out=[];
  for(const im of imgs){
   if(im.verified===false||!im.character_id||!im.blob||(allowed&&!allowed.has(im.character_id)))continue;
   try{
@@ -72,10 +77,10 @@ async function imageCandidates(data,chars,candidateIds){
    if(Array.isArray(im.features)&&im.features.length){
     for(const ref of im.features){
      const v=Array.isArray(ref)?ref:ref?.vector;
-     if(v) s=Math.max(s,featureSimilarity(q,v));
+     if(v) for(const qv of q)s=Math.max(s,featureSimilarity(qv.vector,v));
     }
    }
-   if(s<=0&&im.blob){const f=await imageFeature(im.blob);s=featureSimilarity(q,f)}
+   if(s<=0&&im.blob){const f=await imageFeatures(im.blob);for(const qv of q)for(const fv of f)s=Math.max(s,featureSimilarity(qv.vector,fv.vector))}
    if(s>0)out.push({id:im.character_id,score:s,reference_id:im.id,reference_name:im.reference_name||'',reference_title:im.reference_title||''});
   }catch{}
  }
