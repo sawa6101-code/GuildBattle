@@ -35,7 +35,12 @@ async function api(url,options={}){
  if(!sessionToken)throw new Error('GitHubアクセストークンが設定されていません');
  const r=await fetch(url,Object.assign({headers:headers()},options));
  const text=await r.text();let data=null;try{data=text?JSON.parse(text):null}catch{}
- if(!r.ok)throw new Error((data&&data.message)||('GitHub API HTTP '+r.status));
+ if(!r.ok){
+  const msg=(data&&data.message)||'GitHub API HTTP '+r.status;
+  const e=new Error('GitHub API '+r.status+': '+msg);
+  e.status=r.status;e.githubMessage=msg;
+  throw e;
+}
  return data;
 }
 async function getFile(c,path){
@@ -163,7 +168,13 @@ function installUI(){
  const setStatus=t=>{const e=document.querySelector('#ghImgStatus');if(e)e.textContent=t};
  (async()=>{const c=await config();['owner','repo','branch'].forEach(k=>{const e=document.querySelector('#ghImg'+k[0].toUpperCase()+k.slice(1));if(e)e.value=c[k]})})();
  const saveFields=async()=>{const c=await config();c.owner=$('#ghImgOwner').value.trim()||DEFAULT.owner;c.repo=$('#ghImgRepo').value.trim()||DEFAULT.repo;c.branch=$('#ghImgBranch').value.trim()||DEFAULT.branch;await saveConfig(c);return c};
- document.querySelector('#ghImgTest').onclick=async()=>{try{await saveFields();if(!sessionToken){const t=$('#ghImgToken').value.trim();if(!t)return setStatus('トークンを入力してください。');setToken(t)}const r=await testConnection();setStatus('接続成功: '+r.repo+(r.private?'（private）':'（public）'))}catch(e){setStatus('接続失敗: '+e.message)}};
+ document.querySelector('#ghImgTest').onclick=async()=>{try{await saveFields();if(!sessionToken){const t=$('#ghImgToken').value.trim();if(!t)return setStatus('トークンを入力してください。');setToken(t)}const r=await testConnection();setStatus('接続成功: '+r.repo+(r.private?'（private）':'（public）'))}catch(e){
+  let msg=e.message;
+  if(e.status===401)msg='認証失敗（401）。Tokenが無効/期限切れ、またはBearer認証で利用できないTokenです。';
+  else if(e.status===403)msg='権限拒否（403）。Fine-grained Tokenの対象リポジトリとContents権限を確認してください。';
+  else if(e.status===404)msg='リポジトリが見つかりません（404）。Owner/Repository/Tokenの対象リポジトリを確認してください。';
+  setStatus('接続失敗: '+msg);
+}};
  document.querySelector('#ghImgMigrate').onclick=async()=>{try{await saveFields();if(!sessionToken){const t=$('#ghImgToken').value.trim();if(!t)return setStatus('トークンを入力してください。');setToken(t)}document.querySelector('#ghImgMigrate').disabled=true;const r=await migrateLocalImages(x=>setStatus('GitHub移行中 '+x.done+'/'+x.total+' / 失敗 '+x.failed+' / '+x.last));setStatus('移行完了: '+r.done+'件 / 失敗 '+r.failed+'件');}catch(e){setStatus('移行失敗: '+e.message)}finally{document.querySelector('#ghImgMigrate').disabled=false}};
  document.querySelector('#ghImgSync').onclick=async()=>{try{const r=await syncManifest();setStatus('GitHub画像同期: '+r.count+'件 / 取得失敗 '+r.missing+'件')}catch(e){setStatus('同期失敗: '+e.message)}};
  document.querySelector('#ghImgClear').onclick=()=>{clearToken();$('#ghImgToken').value='';setStatus('GitHubトークンをメモリから消去しました。')};
