@@ -230,17 +230,44 @@ async function apply(result,manual={}){
  db.close();return saved;
 }
 async function refreshTargetParties(){
- const box=document.querySelector('#partyShotAwake'),sel=document.querySelector('#psaParty'),memberId=window.__guildBattleCurrentMemberId;if(!box||!sel||!memberId)return;
+ const box=document.querySelector('#partyShotAwake'),sel=document.querySelector('#psaParty'),memberId=window.__guildBattleCurrentMemberId;
+ if(!box||!sel||!memberId)return;
+ const previous=sel.value||'';
+ const setOptions=(ps)=>{
+  const sorted=ps.slice().sort((a,b)=>Number(a.party_no??a.partyNo)-Number(b.party_no??b.partyNo));
+  sel.innerHTML=sorted.length?sorted.map(p=>'<option value="'+esc(p.id)+'">PT'+Number(p.party_no??p.partyNo)+(p.name?' ・ '+esc(p.name):'')+'</option>').join(''):'<option value="">PTが登録されていません</option>';
+  if(previous&&sorted.some(p=>String(p.id)===String(previous)))sel.value=previous;
+ };
+ let localDb=null;
  try{
-  const db=await openDB();let ps=(await all(db,'parties')).filter(p=>String(p.member_id??p.memberId)===String(memberId)).sort((a,b)=>Number(a.party_no??a.partyNo)-Number(b.party_no??b.partyNo));
-  if(ps.length<2){
-   const member=(await all(db,'members')).find(m=>String(m.id)===String(memberId));
-   if(member)for(let n=1;n<=2;n++)if(!ps.some(p=>Number(p.party_no??p.partyNo)===n)){const p={id:'party_'+crypto.randomUUID(),member_id:member.id,party_no:n,name:'PT'+n,total_power:0,hp_current:0,hp_max:0,fatigue_value:0,fatigue_multiplier:1,battle_count:0,win_count:0,loss_count:0,draw_count:0,active:true,created_at:new Date().toISOString(),updated_at:new Date().toISOString()};await put(db,'parties',p);ps.push(p)}
-   ps.sort((a,b)=>Number(a.party_no??a.partyNo)-Number(b.party_no??b.partyNo));
+  // app.js側のDB接続を優先。別接続を開いてversion競合を起こさない。
+  if(window.db&&typeof window.db.transaction==='function'){
+   localDb=window.db;
+  }else{
+   localDb=await openDB();
   }
-  db.close();const old=sel.value;sel.innerHTML=ps.map(p=>'<option value="'+esc(p.id)+'">PT'+p.party_no+(p.name?' ・ '+esc(p.name):'')+'</option>').join('');
-  if(old&&ps.some(p=>p.id===old))sel.value=old;if(!ps.length)sel.innerHTML='<option value="">PTが登録されていません</option>';
- }catch(e){console.error('PT selector refresh error',e);sel.innerHTML='<option value="">PT取得エラー</option>'}
+  const members=await all(localDb,'members');
+  const member=members.find(m=>String(m.id)===String(memberId));
+  if(!member){setOptions([]);return;}
+  let ps=(await all(localDb,'parties')).filter(p=>String(p.member_id??p.memberId)===String(memberId));
+  if(ps.length<2){
+   for(let n=1;n<=2;n++){
+    if(!ps.some(p=>Number(p.party_no??p.partyNo)===n)){
+     const p={id:'party_'+crypto.randomUUID(),member_id:member.id,party_no:n,name:'PT'+n,total_power:0,hp_current:0,hp_max:0,fatigue_value:0,fatigue_multiplier:1,battle_count:0,win_count:0,loss_count:0,draw_count:0,active:true,created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+     await put(localDb,'parties',p);ps.push(p);
+    }
+   }
+  }
+  setOptions(ps);
+ }catch(e){
+  console.error('PT selector refresh error',e);
+  // 取得失敗時も既存選択肢を消さず、原因を画面に残す。
+  if(!sel.options.length)sel.innerHTML='<option value="">PT取得エラー</option>';
+  sel.title='PT取得エラー: '+(e?.message||String(e));
+ }finally{
+  // app.jsの共有DBは閉じない。自前接続を開いた場合のみ閉じる。
+  if(localDb&&localDb!==window.db)try{localDb.close()}catch{}
+ }
 }
 function install(){
  const host=document.querySelector('#memberDetail');if(!host)return;const existing=host.querySelector('#partyShotAwake');if(existing){refreshTargetParties();return}
