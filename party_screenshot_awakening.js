@@ -84,8 +84,8 @@ function nameMatch(text,chars){
  return chars.map(c=>{
   const p=characterParts(c);
   const exact=raw.includes(p.full)&&p.full.length>0?1:0;
-  const base=raw.includes(p.base)&&p.base.length>=2?.94:0;
-  const title=raw.includes(p.title)&&p.title.length>=3?.92:0;
+  const base=(raw.includes(p.base)&&p.base.length>=2)?0.94:0;
+  const title=(raw.includes(p.title)&&p.title.length>=3)?0.92:0;
   const fuzzy=Math.max(levenshtein(raw,c.name),p.base?levenshtein(raw,p.base):0,p.title?levenshtein(raw,p.title):0);
   return {...c,score:Math.max(exact,base,title,fuzzy)};
  }).sort((a,b)=>b.score-a.score).slice(0,12);
