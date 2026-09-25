@@ -93,15 +93,22 @@ function characterParts(c){
  return {base:norm(m?m[1]:c.name),title:norm(m?m[2]:(c.title||'')),full:norm(c.name)};
 }
 function nameMatch(text,chars){
- const raw=norm(text);
+ const raw=String(text||'');
+ const lines=raw.split(/\\r?\\n/).map(x=>norm(x)).filter(x=>x.length>=2);
  return chars.map(c=>{
-  const p=characterParts(c);
-  const exact=raw.includes(p.full)&&p.full.length>0?1:0;
-  const base=(raw.includes(p.base)&&p.base.length>=2)?0.94:0;
-  const title=(raw.includes(p.title)&&p.title.length>=3)?0.92:0;
-  const fuzzy=Math.max(levenshtein(raw,c.name),p.base?levenshtein(raw,p.base):0,p.title?levenshtein(raw,p.title):0);
-  return {...c,score:Math.max(exact,base,title,fuzzy)};
- }).sort((a,b)=>b.score-a.score).slice(0,12);
+  const p=characterParts(c), variants=[p.full,p.base,p.title].filter(x=>x&&x.length>=2);
+  let exact=0,base=0,title=0,fuzzy=0;
+  for(const line of lines){
+   if(p.full&&line.includes(p.full))exact=Math.max(exact,1);
+   if(p.base&&line.includes(p.base))base=Math.max(base,.96);
+   if(p.title&&line.includes(p.title))title=Math.max(title,.94);
+   for(const v of variants){
+    const sim=levenshtein(line,v);
+    if(sim>.55)fuzzy=Math.max(fuzzy,sim*.82);
+   }
+  }
+  return {...c,score:Math.max(exact,base,title,fuzzy),name_score:Math.max(exact,base,title,fuzzy)};
+ }).sort((a,b)=>b.score-a.score).slice(0,20);
 }
 function combineCandidates(chars,names,visual,rarity,element){
  const map=new Map();
@@ -120,7 +127,7 @@ function combineCandidates(chars,names,visual,rarity,element){
   const elementMatch=element.value&&String(r.element||'')===element.value;
   const metaBonus=(rarityMatch?.025:0)+(elementMatch?.025:0);
   const imageBase=r.image_score>0?r.image_score*.96:0;
-  const base=Math.max(r.name_score,imageBase);
+  const base=r.name_score>=.9&&r.image_score>0?Math.max(r.name_score,imageBase):r.name_score>0?Math.max(r.name_score,imageBase*.82):(r.image_score>=.94?r.image_score:.84*r.image_score);
   return {...r,rarity_match:!!rarityMatch,element_match:!!elementMatch,score:Math.min(1,base+metaBonus)};
  }).sort((a,b)=>b.score-a.score||b.image_score-a.image_score||b.name_score-a.name_score);
  return rows;
