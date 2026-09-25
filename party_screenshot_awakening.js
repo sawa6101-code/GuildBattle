@@ -68,7 +68,14 @@ async function imageCandidates(data,chars,candidateIds){
  for(const im of imgs){
   if(im.verified===false||!im.character_id||!im.blob||(allowed&&!allowed.has(im.character_id)))continue;
   try{
-   const f=await imageFeature(im.blob),s=featureSimilarity(q,f);
+   let s=0;
+   if(Array.isArray(im.features)&&im.features.length){
+    for(const ref of im.features){
+     const v=Array.isArray(ref)?ref:ref?.vector;
+     if(v) s=Math.max(s,featureSimilarity(q,v));
+    }
+   }
+   if(s<=0&&im.blob){const f=await imageFeature(im.blob);s=featureSimilarity(q,f)}
    if(s>0)out.push({id:im.character_id,score:s,reference_id:im.id,reference_name:im.reference_name||'',reference_title:im.reference_title||''});
   }catch{}
  }
