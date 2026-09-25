@@ -11,5 +11,5 @@ function render(){const chars=window.__crsChars||[],refs=window.__crsRefs||[],q=
 async function load(){const d=await openDB(),chars=await all(d,'characters'),refs=await all(d,'characterImages');d.close();window.__crsChars=chars;window.__crsRefs=refs;render()}
 function install(){if(!$('#characterReferenceStatus'))return;$('#crsSearch').oninput=render;$('#crsFilter').onchange=render;$('#crsReload').onclick=()=>load().catch(e=>alert('画像参照状況の更新に失敗しました: '+e.message));load().catch(e=>console.error(e));window.CharacterReferenceStatus={load,render}}
 document.addEventListener('DOMContentLoaded',install);
-document.addEventListener('click',e=>{if(e.target.closest('[data-view="characterReferenceStatus"]'))setTimeout(()=>load().catch(console.error),0)});
+document.addEventListener('click',e=>{if(e.target.closest('[data-view="characterReferenceStatus"]'))setTimeout(()=>load().catch(console.error),0)});\ndocument.addEventListener('github-character-images-synced',()=>load().catch(console.error));
 })();
