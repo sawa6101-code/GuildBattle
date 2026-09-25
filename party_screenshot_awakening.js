@@ -80,7 +80,8 @@ async function imageCandidates(data,chars,candidateIds){
   }catch{}
  }
  const best={};for(const x of out)if(!best[x.id]||best[x.id].score<x.score)best[x.id]=x;
- return Object.values(best).map(x=>{const c=chars.find(v=>v.id===x.id);return c?{...c,score:x.score,reference_id:x.reference_id,reference_name:x.reference_name,reference_title:x.reference_title}:null}).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,12);
+ const counts={};for(const im of imgs)if(im.verified!==false&&im.character_id)counts[im.character_id]=(counts[im.character_id]||0)+1;
+ return Object.values(best).map(x=>{const c=chars.find(v=>v.id===x.id);return c?{...c,score:x.score,reference_id:x.reference_id,reference_name:x.reference_name,reference_title:x.reference_title,reference_count:counts[x.id]||0}:null}).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,12);
 }
 function characterParts(c){
  const m=String(c.name||'').match(/^(.*?)[（(](.*)[）)]$/);
