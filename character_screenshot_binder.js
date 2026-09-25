@@ -153,7 +153,7 @@ async function confirmRegistration(){
  const d=await openDB(),ts=new Date().toISOString();
  ctx.rec.character_id=selected;ctx.rec.match_status='CONFIRMED';ctx.rec.match_stage=5;ctx.rec.match_confidence=1;ctx.rec.confirmed_at=ts;
  await put(d,'characterScreenshots',ctx.rec);
- await put(d,'characterImages',{id:'img_'+crypto.randomUUID(),character_id:selected,image_type:'card',blob:ctx.blob,features:ctx.features,verified:true,reference_scope:'character_variant',reference_name:c.name,reference_title:c.title||'',feature_version:'binder-v3',verification_source:'user_confirmed',created_at:ts});
+ await put(d,'characterImages',{id:'img_'+crypto.randomUUID(),character_id:selected,image_type:'card',blob:ctx.blob,features:ctx.features,verified:true,reference_scope:'character_variant',reference_name:c.name,reference_title:c.title||'',feature_version:'binder-v3',verification_source:'user_confirmed',created_at:ts});\n const githubUpload=window.GitHubImageStore?.uploadCharacterImage?await window.GitHubImageStore.uploadCharacterImage(selected,ctx.blob,{name:c.name,title:c.title||'',verification_source:'user_confirmed'}).catch(e=>({ok:false,error:e.message})):null;
  if(ctx.skills.length){
   const old=Array.isArray(c.skill_data?.skills)?c.skill_data.skills:[];
   const merged=[...old];
