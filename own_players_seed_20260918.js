@@ -1,6 +1,6 @@
 /* Own guild player import seed: screenshots 2026-09-18. */
 (function(){
-const DB='paranoise-guildbattle',VER=3;
+const DB='paranoise-guildbattle',VER=6;
 const PLAYERS=[
 {name:'猛暑☠HINA☆ボコ',level:139,power:46550902,points:17575},
 {name:'クロろんこたれ蔵',level:153,power:145543359,points:60790},
