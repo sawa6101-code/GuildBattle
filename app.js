@@ -112,5 +112,6 @@ async function forceAppUpdate(){
 }
 window.restoreGuildBattleData=restoreGuildBattleData;window.openMember=openMember;window.openGuild=openGuild;window.addOwnMember=addOwnMember;window.openCharacterForm=openCharacterForm;window.saveParty=saveParty;window.deleteCharacter=deleteCharacter;window.showCharacterDetail=showCharacterDetail;window.renderCharacters=renderCharacters;window.refreshStats=refreshStats;
 function bindPlusButtons(){const ag=$('#addGuild');if(ag)ag.onclick=e=>{e.preventDefault();e.stopPropagation();addGuild().catch(err=>{console.error(err);alert('敵ギルド追加に失敗しました。')})};const nc=$('#newCharacter');if(nc)nc.onclick=e=>{e.preventDefault();e.stopPropagation();openCharacterForm()};const ao=$('#addOwn');if(ao)ao.onclick=e=>{e.preventDefault();e.stopPropagation();addOwnMember().catch(err=>{console.error(err);alert('自軍メンバー追加に失敗しました。')})}}
+window.addEventListener('guildbattle-recovery-complete',async()=>{try{await ensureOwn();await refreshStats();await renderOwn();await renderGuilds();await renderCharacters();}catch(e){console.warn('recovery UI refresh:',e);}});
 const _show=show;show=async function(view){_show(view);setTimeout(bindPlusButtons,0)};
 setTimeout(bindPlusButtons,0);init();
