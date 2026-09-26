@@ -3,7 +3,7 @@
    missing core records after the normal DB has been cleared. */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle',VER=4;
+const DB='paranoise-guildbattle',VER=6;
 const RDB='GuildBattleRecovery',RVER=2;
 const STORES=['guilds','members','parties','partyCharacters','characters'];
 const openDB=(name,ver)=>new Promise((res,rej)=>{const r=indexedDB.open(name,ver);r.onupgradeneeded=()=>{const d=r.result;if(name===RDB&&!d.objectStoreNames.contains('snapshots'))d.createObjectStore('snapshots',{keyPath:'store'});};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
