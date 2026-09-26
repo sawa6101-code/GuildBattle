@@ -30,6 +30,7 @@ async function restoreIfMissing(){
 async function run(){
  try{await restoreIfMissing();}catch(e){console.warn('isolated recovery restore:',e);}
  try{await snapshot();}catch(e){console.warn('isolated recovery snapshot:',e);}
+ try{window.dispatchEvent(new CustomEvent('guildbattle-recovery-complete'));}catch(e){}
 }
 setTimeout(run,6000);
 window.GuildBattleRecovery={run,snapshot,restoreIfMissing};
