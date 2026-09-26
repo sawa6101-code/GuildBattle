@@ -72,7 +72,7 @@ window.deleteMember=deleteMember;window.deleteGuild=deleteGuild;window.cleanupRe
 window.GuildBattleDB={getDB:()=>db,all,get,put,remove,version:DB_VERSION};
 async function init(){await openDB();await ensureOwn();await refreshStats();await renderOwn();await renderCharacters();setupAppUpdater()}
 /* App update controller */
-const APP_VERSION='2026.09.19-v20';
+const APP_VERSION='2026.09.26-v21';
 function setupAppUpdater(){
   if(!('serviceWorker' in navigator))return;
   let reloading=false;
