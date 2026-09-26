@@ -21,8 +21,18 @@ function get(d,n,k){return new Promise((ok,no)=>{const r=d.transaction(n).object
 function put(d,n,x){return new Promise((ok,no)=>{const r=d.transaction(n,'readwrite').objectStore(n).put(x);r.onsuccess=()=>ok(x);r.onerror=()=>no(r.error)})}
 
 async function config(){
- const d=await openDB();let c=await get(d,'settings',CONFIG_KEY);d.close();
- return Object.assign({},DEFAULT,c?.config||{});
+ try{
+  const d=await openDB();
+  if(!d.objectStoreNames.contains('settings')){
+   d.close();
+   return Object.assign({},DEFAULT);
+  }
+  let c=await get(d,'settings',CONFIG_KEY);d.close();
+  return Object.assign({},DEFAULT,c?.config||{});
+ }catch(e){
+  console.warn('GitHub image store config fallback:',e);
+  return Object.assign({},DEFAULT);
+ }
 }
 async function saveConfig(c){
  const d=await openDB();await put(d,'settings',{key:CONFIG_KEY,config:Object.assign({},DEFAULT,c),updated_at:now()});d.close();
@@ -33,7 +43,15 @@ function headers(){return {'Accept':'application/vnd.github+json','Content-Type'
 
 async function api(url,options={}){
  if(!sessionToken)throw new Error('GitHubアクセストークンが設定されていません');
- const r=await fetch(url,Object.assign({headers:headers()},options));
+ let r;
+ try{
+  r=await fetch(url,Object.assign({headers:headers()},options));
+ }catch(e){
+  const x=new Error('GitHub APIへの通信に失敗しました: '+(e?.message||String(e)));
+  x.cause=e;
+  x.networkError=true;
+  throw x;
+ }
  const text=await r.text();let data=null;try{data=text?JSON.parse(text):null}catch{}
  if(!r.ok){
   const msg=(data&&data.message)||'GitHub API HTTP '+r.status;
@@ -150,7 +168,9 @@ async function migrateLocalImages(progress){
  return {total:targets.length,done,failed,results};
 }
 async function testConnection(){
- const c=await config();const r=await api(apiBase(c));return {login:r?.owner?.login||'',repo:r?.full_name||'',private:!!r?.private};
+ const c=Object.assign({},DEFAULT);
+ const r=await api(apiBase(c));
+ return {login:r?.owner?.login||'',repo:r?.full_name||'',private:!!r?.private};
 }
 function setToken(token){sessionToken=String(token||'').trim();return !!sessionToken}
 function clearToken(){sessionToken=''}
@@ -169,10 +189,11 @@ function installUI(){
  (async()=>{const c=await config();['owner','repo','branch'].forEach(k=>{const e=document.querySelector('#ghImg'+k[0].toUpperCase()+k.slice(1));if(e)e.value=c[k]})})();
  const saveFields=async()=>{const c=await config();c.owner=$('#ghImgOwner').value.trim()||DEFAULT.owner;c.repo=$('#ghImgRepo').value.trim()||DEFAULT.repo;c.branch=$('#ghImgBranch').value.trim()||DEFAULT.branch;await saveConfig(c);return c};
  document.querySelector('#ghImgTest').onclick=async()=>{try{await saveFields();if(!sessionToken){const t=$('#ghImgToken').value.trim();if(!t)return setStatus('トークンを入力してください。');setToken(t)}const r=await testConnection();setStatus('接続成功: '+r.repo+(r.private?'（private）':'（public）'))}catch(e){
-  let msg=e.message;
-  if(e.status===401)msg='認証失敗（401）。Tokenが無効/期限切れ、またはBearer認証で利用できないTokenです。';
-  else if(e.status===403)msg='権限拒否（403）。Fine-grained Tokenの対象リポジトリとContents権限を確認してください。';
-  else if(e.status===404)msg='リポジトリが見つかりません（404）。Owner/Repository/Tokenの対象リポジトリを確認してください。';
+  let msg=e.message||String(e);
+  if(e.status===401)msg='認証失敗（401）。Tokenが無効/期限切れです。';
+  else if(e.status===403)msg='権限拒否（403）。Fine-grained Tokenの対象リポジトリと権限を確認してください。';
+  else if(e.status===404)msg='リポジトリが見つかりません（404）。Owner/Repositoryを確認してください。';
+  else if(e.networkError)msg+='（ブラウザからGitHub APIへ接続できない可能性があります）';
   setStatus('接続失敗: '+msg);
 }};
  document.querySelector('#ghImgMigrate').onclick=async()=>{try{await saveFields();if(!sessionToken){const t=$('#ghImgToken').value.trim();if(!t)return setStatus('トークンを入力してください。');setToken(t)}document.querySelector('#ghImgMigrate').disabled=true;const r=await migrateLocalImages(x=>setStatus('GitHub移行中 '+x.done+'/'+x.total+' / 失敗 '+x.failed+' / '+x.last));setStatus('移行完了: '+r.done+'件 / 失敗 '+r.failed+'件');}catch(e){setStatus('移行失敗: '+e.message)}finally{document.querySelector('#ghImgMigrate').disabled=false}};
