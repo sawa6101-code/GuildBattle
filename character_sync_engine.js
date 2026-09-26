@@ -8,7 +8,7 @@
  */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle', V=3;
+const DB='paranoise-guildbattle', V=6;
 const SOURCE_KEY='character_sync_sources_v1';
 const META_KEY='character_sync_meta';
 const norm=s=>String(s??'').normalize('NFKC').replace(/[\s　]+/g,'').replace(/[（(]/g,'(').replace(/[）)]/g,')').toLowerCase();
