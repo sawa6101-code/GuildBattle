@@ -1,6 +1,6 @@
 /* Enemy guild import seed: 月のしずく (screenshot 2026-09-18). */
 (function(){
-const DB='paranoise-guildbattle',VER=3;
+const DB='paranoise-guildbattle',VER=6;
 const PLAYERS=[
 {name:'(ね ^ v ^ る)',level:137,power:57088726,points:21965,memo:'3/29(´・ω・`)ゃー（スクショより）'},
 {name:'とっとこ',level:140,power:51654681,points:26915,memo:'(・-・)（スクショより）'},
