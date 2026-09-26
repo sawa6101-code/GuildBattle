@@ -19,7 +19,7 @@ const R=[
  {name:'ヌメテューサ（双メメった大群にとりこまれる）',rarity:'SR',title:'双メメった大群にとりこまれる',skills:['アタック（全体）'],source:'画像(20260920-045510).jpeg',provisional:true},
  {name:'ナンヨウ（ゾト目で世界を掌握）',rarity:'SR',title:'ゾト目で世界を掌握',skills:['アタック（2体）'],source:'画像(20260920-045510).jpeg',provisional:true}
 ];
-const open=()=>new Promise((res,rej)=>{const r=indexedDB.open(DB);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const open=()=>new Promise((res,rej)=>{const r=indexedDB.open(DB,6);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const all=(d,n)=>new Promise((res,rej)=>{const r=d.transaction(n).objectStore(n).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const put=(d,n,x)=>new Promise((res,rej)=>{const r=d.transaction(n,'readwrite').objectStore(n).put(x);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)});
 const norm=s=>String(s||'').normalize('NFKC').replace(/[\s　]/g,'').replace(/[（）]/g,m=>m==='（'?'(' : ')');
