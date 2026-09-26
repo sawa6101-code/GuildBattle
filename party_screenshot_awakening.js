@@ -240,11 +240,17 @@ async function refreshTargetParties(){
  };
  let localDb=null;
  try{
-  // app.js側のDB接続を優先。別接続を開いてversion競合を起こさない。
-  if(window.db&&typeof window.db.transaction==='function'){
-   localDb=window.db;
+  // アプリ本体の共有DBを最優先。window.dbが公開されていない構成にも対応する。
+  // 独自接続を開くのは共有DBが利用できない場合だけにする。
+  if(window.GuildBattleDB?.getDB){
+   localDb=window.GuildBattleDB.getDB();
+  }else if(typeof db!=='undefined'&&db&&typeof db.transaction==='function'){
+   localDb=db;
   }else{
    localDb=await openDB();
+  }
+  if(!localDb||!localDb.objectStoreNames.contains('members')||!localDb.objectStoreNames.contains('parties')){
+   throw new Error('IndexedDBのmembers/partiesストアが利用できません。アプリを最新版へ更新してください。');
   }
   const members=await all(localDb,'members');
   const member=members.find(m=>String(m.id)===String(memberId));
@@ -266,7 +272,7 @@ async function refreshTargetParties(){
   sel.title='PT取得エラー: '+(e?.message||String(e));
  }finally{
   // app.jsの共有DBは閉じない。自前接続を開いた場合のみ閉じる。
-  if(localDb&&localDb!==window.db)try{localDb.close()}catch{}
+  if(localDb&&localDb!==window.db&&localDb!==window.GuildBattleDB?.getDB?.())try{localDb.close()}catch{}
  }
 }
 function install(){
