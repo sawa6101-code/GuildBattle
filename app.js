@@ -68,6 +68,8 @@ async function cleanupRequestedData(){
  await refreshStats();await renderOwn();await renderGuilds();alert(`整理完了：自軍未登録 ${removedOwn}人、敵ギルド2〜16を ${removedGuilds}ギルド削除しました。`);
 }
 window.deleteMember=deleteMember;window.deleteGuild=deleteGuild;window.cleanupRequestedData=cleanupRequestedData;
+// PTスクショ機能など外部モジュールから安全に共有DBへアクセスできるよう公開する。
+window.GuildBattleDB={getDB:()=>db,all,get,put,remove,version:DB_VERSION};
 async function init(){await openDB();await ensureOwn();await refreshStats();await renderOwn();await renderCharacters();setupAppUpdater()}
 /* App update controller */
 const APP_VERSION='2026.09.19-v20';
