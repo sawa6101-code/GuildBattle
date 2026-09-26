@@ -63,7 +63,7 @@ async function api(url,options={}){
  return data;
 }
 async function getFile(c,path){
- const r=await fetch(apiBase(c)+'/contents/'+path.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(c.branch),{headers:{Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2026-03-10'}});
+ const r=await fetch(apiBase(c)+'/contents/'+path.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(c.branch),{headers:{Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}});
  if(r.status===404)return null;
  const t=await r.text();let d=null;try{d=t?JSON.parse(t):null}catch{}
  if(!r.ok)throw new Error((d&&d.message)||('GitHub GET HTTP '+r.status));
@@ -168,8 +168,8 @@ async function migrateLocalImages(progress){
  }
  return {total:targets.length,done,failed,results};
 }
-async function testConnection(){
- const c=Object.assign({},DEFAULT);
+async function testConnection(cArg){
+ const c=Object.assign({},DEFAULT,cArg||{});
  const r=await api(apiBase(c),{method:'GET',headers:headers(false)});
  return {login:r?.owner?.login||'',repo:r?.full_name||'',private:!!r?.private};
 }
@@ -189,7 +189,7 @@ function installUI(){
  const setStatus=t=>{const e=document.querySelector('#ghImgStatus');if(e)e.textContent=t};
  (async()=>{const c=await config();['owner','repo','branch'].forEach(k=>{const e=document.querySelector('#ghImg'+k[0].toUpperCase()+k.slice(1));if(e)e.value=c[k]})})();
  const saveFields=async()=>{const c=await config();c.owner=$('#ghImgOwner').value.trim()||DEFAULT.owner;c.repo=$('#ghImgRepo').value.trim()||DEFAULT.repo;c.branch=$('#ghImgBranch').value.trim()||DEFAULT.branch;await saveConfig(c);return c};
- document.querySelector('#ghImgTest').onclick=async()=>{try{await saveFields();if(!sessionToken){const t=$('#ghImgToken').value.trim();if(!t)return setStatus('トークンを入力してください。');setToken(t)}const r=await testConnection();setStatus('接続成功: '+r.repo+(r.private?'（private）':'（public）'))}catch(e){
+ document.querySelector('#ghImgTest').onclick=async()=>{try{await saveFields();if(!sessionToken){const t=$('#ghImgToken').value.trim();if(!t)return setStatus('トークンを入力してください。');setToken(t)}const r=await testConnection(await config());setStatus('接続成功: '+r.repo+(r.private?'（private）':'（public）'))}catch(e){
   let msg=e.message||String(e);
   if(e.status===401)msg='認証失敗（401）。Tokenが無効/期限切れです。';
   else if(e.status===403)msg='権限拒否（403）。Fine-grained Tokenの対象リポジトリと権限を確認してください。';
