@@ -70,7 +70,7 @@ async function cleanupRequestedData(){
 window.deleteMember=deleteMember;window.deleteGuild=deleteGuild;window.cleanupRequestedData=cleanupRequestedData;
 // PTスクショ機能など外部モジュールから安全に共有DBへアクセスできるよう公開する。
 window.GuildBattleDB={getDB:()=>db,all,get,put,remove,version:DB_VERSION};
-async function init(){await openDB();await ensureOwn();await refreshStats();await renderOwn();await renderCharacters();setupAppUpdater()}
+async function init(){await openDB();try{if(window.GuildBattleRecovery?.restoreIfMissing)await window.GuildBattleRecovery.restoreIfMissing();}catch(e){console.warn('pre-init recovery:',e)}await ensureOwn();await refreshStats();await renderOwn();await renderCharacters();setupAppUpdater()}
 /* App update controller */
 const APP_VERSION='2026.09.26-v21';
 function setupAppUpdater(){
