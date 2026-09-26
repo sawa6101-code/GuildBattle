@@ -2,7 +2,7 @@
    Source-backed SSR/SR combat data. Unknown mechanics are not invented. */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle',V=3;
+const DB='paranoise-guildbattle',V=6;
 const M=[
 {name:'橘 結衣（その視線の先に）',rarity:'SSR',element:'地',attack_type:'特殊アタッカー',max_mp:6,
  passives:[{name:'復讐スリープ(2体)',trigger:'敵の攻撃で戦闘不能',effect:'その敵と別のランダムな敵1体を睡眠状態にする',awakening_rates:[10,20,40,70,100],status:'sleep'}],
