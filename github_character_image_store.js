@@ -6,7 +6,7 @@
 */
 (function(){
 'use strict';
-const DB='paranoize-guildbattle', V=4;
+const DB='paranoise-guildbattle', V=4;
 const DEFAULT={owner:'sawa6101-code',repo:'GuildBattle',branch:'main',directory:'characters',manifest:'data/character-images.json'};
 const CONFIG_KEY='github_character_image_store_v1';
 let sessionToken='';
