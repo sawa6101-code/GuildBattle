@@ -12,8 +12,14 @@ const put=(d,n,x)=>new Promise((res,rej)=>{const q=d.transaction(n,'readwrite').
 const count=(d,n)=>new Promise((res,rej)=>{const q=d.transaction(n).objectStore(n).count();q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)});
 async function snapshot(){
  const d=await openDB(DB,VER), r=await openDB(RDB,RVER);
- for(const s of STORES){const rows=await all(d,s);await put(r,'snapshots',{store:s,rows,saved_at:new Date().toISOString()});}
- await put(r,'snapshots',{store:'meta',rows:[{version:'2026-09-19.2',protected:true,description:'自軍・敵軍・キャラDBの隔離バックアップ'}],saved_at:new Date().toISOString()});
+ const existing=await all(r,'snapshots');
+ for(const s of STORES){
+  const rows=await all(d,s);
+  const prev=existing.find(x=>x.store===s);
+  if(prev?.rows?.length>rows.length)continue;
+  await put(r,'snapshots',{store:s,rows,saved_at:new Date().toISOString()});
+ }
+ await put(r,'snapshots',{store:'meta',rows:[{version:'2026-09-26.1',protected:true,description:'自軍・敵軍・キャラDBの隔離バックアップ'}],saved_at:new Date().toISOString()});
  d.close();r.close();
 }
 async function restoreIfMissing(){
