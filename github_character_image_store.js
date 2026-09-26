@@ -170,8 +170,9 @@ async function migrateLocalImages(progress){
 }
 async function testConnection(cArg){
  const c=Object.assign({},DEFAULT,cArg||{});
- const r=await api(apiBase(c),{method:'GET',headers:headers(false)});
- return {login:r?.owner?.login||'',repo:r?.full_name||'',private:!!r?.private};
+ const r=await api(apiBase(c)+'/contents?ref='+encodeURIComponent(c.branch),{method:'GET',headers:headers(false)});
+ const items=Array.isArray(r)?r:[];
+ return {repo:c.owner+'/'+c.repo,branch:c.branch,items:items.length};
 }
 function setToken(token){sessionToken=String(token||'').trim();return !!sessionToken}
 function clearToken(){sessionToken=''}
