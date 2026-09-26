@@ -190,7 +190,7 @@ function installUI(){
  const setStatus=t=>{const e=document.querySelector('#ghImgStatus');if(e)e.textContent=t};
  (async()=>{const c=await config();['owner','repo','branch'].forEach(k=>{const e=document.querySelector('#ghImg'+k[0].toUpperCase()+k.slice(1));if(e)e.value=c[k]})})();
  const saveFields=async()=>{const c=await config();c.owner=$('#ghImgOwner').value.trim()||DEFAULT.owner;c.repo=$('#ghImgRepo').value.trim()||DEFAULT.repo;c.branch=$('#ghImgBranch').value.trim()||DEFAULT.branch;await saveConfig(c);return c};
- document.querySelector('#ghImgTest').onclick=async()=>{try{await saveFields();if(!sessionToken){const t=$('#ghImgToken').value.trim();if(!t)return setStatus('トークンを入力してください。');setToken(t)}const r=await testConnection(await config());setStatus('接続成功: '+r.repo+(r.private?'（private）':'（public）'))}catch(e){
+ document.querySelector('#ghImgTest').onclick=async()=>{try{await saveFields();if(!sessionToken){const t=$('#ghImgToken').value.trim();if(!t)return setStatus('トークンを入力してください。');setToken(t)}const r=await testConnection(await config());setStatus('接続成功: '+r.repo+' / branch='+r.branch+' / Contents '+r.items+'件')}catch(e){
   let msg=e.message||String(e);
   if(e.status===401)msg='認証失敗（401）。Tokenが無効/期限切れです。';
   else if(e.status===403)msg='権限拒否（403）。Fine-grained Tokenの対象リポジトリと権限を確認してください。';
