@@ -25,7 +25,7 @@ function match(name,key){
  (key==='入場スタン(2体)'&&a.includes('入場スタン')) ||
  (key==='入場ポイズン(全体)'&&a.includes('入場ポイズン'));
 }
-function open(){return new Promise((res,rej)=>{const r=indexedDB.open(DB);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+function open(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,6);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 function all(d,n){return new Promise((res,rej)=>{const r=d.transaction(n).objectStore(n).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 function put(d,n,x){return new Promise((res,rej)=>{const r=d.transaction(n,'readwrite').objectStore(n).put(x);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
 async function run(){
