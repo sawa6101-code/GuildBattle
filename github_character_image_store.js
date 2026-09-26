@@ -39,13 +39,14 @@ async function saveConfig(c){
 }
 function apiBase(c){return 'https://api.github.com/repos/'+encodeURIComponent(c.owner)+'/'+encodeURIComponent(c.repo)}
 function rawBase(c){return 'https://raw.githubusercontent.com/'+c.owner+'/'+c.repo+'/'+c.branch}
-function headers(){return {'Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2026-03-10','Authorization':'Bearer '+sessionToken}}
+function headers(write=false){const h={'Accept':'application/vnd.github+json','Authorization':'Bearer '+sessionToken};if(write){h['Content-Type']='application/json';h['X-GitHub-Api-Version']='2026-03-10'}return h}
 
 async function api(url,options={}){
  if(!sessionToken)throw new Error('GitHubアクセストークンが設定されていません');
  let r;
  try{
-  r=await fetch(url,Object.assign({headers:headers()},options));
+  const method=String(options.method||'GET').toUpperCase();
+  r=await fetch(url,Object.assign({headers:headers(method!=='GET'&&method!=='HEAD')},options));
  }catch(e){
   const x=new Error('GitHub APIへの通信に失敗しました: '+(e?.message||String(e)));
   x.cause=e;
@@ -101,7 +102,7 @@ async function uploadCharacterImage(characterId,source,meta={}){
  const existing=await getFile(c,path);
  const body={message:'chore: update character image '+characterId,content:optimized.base64,branch:c.branch};
  if(existing?.sha)body.sha=existing.sha;
- const saved=await api(apiBase(c)+'/contents/'+path.split('/').map(encodeURIComponent).join('/'),{method:'PUT',body:JSON.stringify(body)});
+ const saved=await api(apiBase(c)+'/contents/'+path.split('/').map(encodeURIComponent).join('/'),{method:'PUT',headers:headers(true),body:JSON.stringify(body)});
  const imageUrl=rawBase(c)+'/'+path;
  const d=await openDB(),imgs=await all(d,'characterImages'),old=imgs.find(x=>x.character_id===characterId&&x.verified!==false);
  const blob=await (await fetch(optimized.dataUrl)).blob(),features=await featuresFromBlob(blob);
@@ -128,7 +129,7 @@ async function updateManifest(c,row){
  const payload={version:1,updated_at:now(),records:[...map.values()].sort((a,b)=>String(a.character_id).localeCompare(String(b.character_id)))};
  const body={message:'chore: update character image manifest',content:btoa(unescape(encodeURIComponent(JSON.stringify(payload,null,2)+'\n'))),branch:c.branch};
  if(m.sha)body.sha=m.sha;
- await api(apiBase(c)+'/contents/'+c.manifest.split('/').map(encodeURIComponent).join('/'),{method:'PUT',body:JSON.stringify(body)});
+ await api(apiBase(c)+'/contents/'+c.manifest.split('/').map(encodeURIComponent).join('/'),{method:'PUT',headers:headers(true),body:JSON.stringify(body)});
 }
 async function syncManifest(){
  const c=await config(),r=await fetch(rawBase(c)+'/'+c.manifest+'?ts='+Date.now(),{cache:'no-store'});
@@ -169,7 +170,7 @@ async function migrateLocalImages(progress){
 }
 async function testConnection(){
  const c=Object.assign({},DEFAULT);
- const r=await api(apiBase(c));
+ const r=await api(apiBase(c),{method:'GET',headers:headers(false)});
  return {login:r?.owner?.login||'',repo:r?.full_name||'',private:!!r?.private};
 }
 function setToken(token){sessionToken=String(token||'').trim();return !!sessionToken}
