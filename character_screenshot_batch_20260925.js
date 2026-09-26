@@ -13,7 +13,7 @@ const R=[
  {name:'蒼木 祥子（婚礼の供物）',rarity:'SSR',element:'光',role:'物理アタッカー',max_mp:6,title:'婚礼の供物',skills:['オートガード','根性','逆境ドレインEX','スタンアサルト','迅速攻撃']},
  {name:'鳳梨 麗華（豪華客船の夜）',rarity:'SSR',element:'風',role:'物理アタッカー',max_mp:6,title:'豪華客船の夜',skills:['ギブターンの遺志','EXオートスリープ','ドリームハンター(2体)','サバイバー']}
 ];
-const open=()=>new Promise((ok,no)=>{const r=indexedDB.open(DB,4);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
+const open=()=>new Promise((ok,no)=>{const r=indexedDB.open(DB,6);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
 const all=(d,n)=>new Promise((ok,no)=>{const r=d.transaction(n).objectStore(n).getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
 const put=(d,n,x)=>new Promise((ok,no)=>{const r=d.transaction(n,'readwrite').objectStore(n).put(x);r.onsuccess=()=>ok();r.onerror=()=>no(r.error)});
 async function run(){
