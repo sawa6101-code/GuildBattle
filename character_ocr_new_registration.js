@@ -1,7 +1,7 @@
 /* GuildBattle - Full Character Detail Screenshot Registration v2 */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle',V=4;
+const DB='paranoise-guildbattle',V=6;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const norm=s=>String(s??'').normalize('NFKC').replace(/[\s　・･「」『』()（）［］【】]/g,'').toLowerCase();
