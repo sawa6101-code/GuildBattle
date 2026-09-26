@@ -31,7 +31,7 @@ const IMPLEMENTED=[
   ['ヌメテューサ（双メメった大群にとりこまれる）','SR'],['ナンヨウ（ゾト目で世界を掌握）','SR']
 ];
 const norm=s=>String(s||'').replace(/[\\s　]/g,'').replace(/[（(]/g,'(').replace(/[）)]/g,')').trim();
-const open=()=>new Promise((res,rej)=>{const r=indexedDB.open(DB,4);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const open=()=>new Promise((res,rej)=>{const r=indexedDB.open(DB,6);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const all=(d,n)=>new Promise((res,rej)=>{const r=d.transaction(n).objectStore(n).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const put=(d,n,x)=>new Promise((res,rej)=>{const r=d.transaction(n,'readwrite').objectStore(n).put(x);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)});
 async function run(){
