@@ -656,7 +656,7 @@ const C=[
   ["Aya（仮登録）","R"],["Catnado（仮登録）","R"],["Kenshin（仮登録）","R"],["Mizuno（仮登録）","R"],["Saki（仮登録）","R"],["Seiji（仮登録）","R"],
   ["R仮登録-01","R"],["R仮登録-02","R"],["R仮登録-03","R"],["R仮登録-04","R"],["R仮登録-05","R"],["R仮登録-06","R"],["R仮登録-07","R"],["R仮登録-08","R"],["R仮登録-09","R"],["R仮登録-10","R"],["R仮登録-11","R"],["R仮登録-12","R"],["R仮登録-13","R"],["R仮登録-14","R"],["R仮登録-15","R"],["R仮登録-16","R"],["R仮登録-17","R"],["R仮登録-18","R"],["R仮登録-19","R"],["R仮登録-20","R"],["R仮登録-21","R"],["R仮登録-22","R"],["R仮登録-23","R"],["R仮登録-24","R"],["R仮登録-25","R"]
 ]
-const DB='paranoise-guildbattle',V=4;
+const DB='paranoise-guildbattle',V=6;
 const open=()=>new Promise((res,rej)=>{const r=indexedDB.open(DB,V);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const all=(d,n)=>new Promise((res,rej)=>{const r=d.transaction(n).objectStore(n).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const put=(d,n,x)=>new Promise((res,rej)=>{const r=d.transaction(n,'readwrite').objectStore(n).put(x);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)});
