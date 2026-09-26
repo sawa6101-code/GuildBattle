@@ -4,7 +4,7 @@
  */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle',V=3;
+const DB='paranoise-guildbattle',V=6;
 const norm=s=>String(s??'').normalize('NFKC').replace(/[\s　]+/g,'').replace(/[（(]/g,'(').replace(/[）)]/g,')').toLowerCase();
 const now=()=>new Date().toISOString();
 const open=()=>new Promise((res,rej)=>{const r=indexedDB.open(DB,V);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
