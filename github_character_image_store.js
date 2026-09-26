@@ -39,7 +39,7 @@ async function saveConfig(c){
 }
 function apiBase(c){return 'https://api.github.com/repos/'+encodeURIComponent(c.owner)+'/'+encodeURIComponent(c.repo)}
 function rawBase(c){return 'https://raw.githubusercontent.com/'+c.owner+'/'+c.repo+'/'+c.branch}
-function headers(write=false){const h={'Accept':'application/vnd.github+json','Authorization':'Bearer '+sessionToken};if(write){h['Content-Type']='application/json';h['X-GitHub-Api-Version']='2026-03-10'}return h}
+function headers(write=false){const h={'Accept':'application/vnd.github+json','Authorization':'Bearer '+sessionToken};if(write){h['Content-Type']='application/json';h['X-GitHub-Api-Version']='2022-11-28'}return h}
 
 async function api(url,options={}){
  if(!sessionToken)throw new Error('GitHubアクセストークンが設定されていません');
