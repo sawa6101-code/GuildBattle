@@ -19,7 +19,7 @@ const EXTRA=[
  ['ナンヨウ（ゾト目で世界を掌握）','SR'],
  ['鳳梨 麗華（鳳梨の名を背負う少女）','SR']
 ];
-const open=()=>new Promise((res,rej)=>{const r=indexedDB.open(DB,4);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const open=()=>new Promise((res,rej)=>{const r=indexedDB.open(DB,6);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const all=(d,n)=>new Promise((res,rej)=>{const r=d.transaction(n).objectStore(n).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const put=(d,n,x)=>new Promise((res,rej)=>{const r=d.transaction(n,'readwrite').objectStore(n).put(x);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)});
 async function run(){
