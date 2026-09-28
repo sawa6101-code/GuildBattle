@@ -1,5 +1,5 @@
 const DB_NAME='paranoize-guildbattle';
-const DB_VERSION=6;
+const DB_VERSION=7;
 const STORES=['guilds','members','parties','partyCharacters','characters','battleMatches','battleResults','fatigueHistory','screenshots','settings','characterImages','characterScreenshots','characterSkillSources'];
 let db=null,currentGuildId=null,currentMemberId=null,memberReturnView='own';
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
