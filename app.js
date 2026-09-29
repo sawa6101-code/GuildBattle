@@ -110,6 +110,47 @@ async function forceAppUpdate(){
     if(status)status.textContent='現在すでに最新版です。';
   }catch(e){if(status)status.textContent='更新確認に失敗しました。再読み込みしてください。';}
 }
+async function recoverLegacyGuildBattleData(){
+  const status=document.getElementById('legacyRecoveryStatus');
+  if(status)status.textContent='旧IndexedDB・隔離バックアップを探索しています…';
+  try{
+    if(!window.GuildBattleLegacyRecovery?.recover)throw new Error('旧DB復旧モジュールが読み込まれていません。');
+    const report=await window.GuildBattleLegacyRecovery.recover();
+    await ensureOwn();await refreshStats();await renderOwn();await renderGuilds();await renderCharacters();
+    const lines=[];
+    let totalPT=0,totalPC=0,totalMembers=0,totalGuilds=0;
+    for(const x of report){
+      if(x.error){lines.push('❌ '+x.source+'：'+x.error);continue}
+      const s=x.stats||{};
+      totalGuilds+=s.guilds||0;totalMembers+=s.members||0;totalPT+=s.parties||0;totalPC+=s.partyCharacters||0;
+      lines.push('✅ '+x.source+' (v'+(x.version??'?')+')：ギルド '+(s.guilds||0)+' / メンバー '+(s.members||0)+' / PT '+(s.parties||0)+' / PTキャラ '+(s.partyCharacters||0));
+    }
+    if(!report.length)lines.push('⚠️ 読み取れる旧DB・隔離バックアップは見つかりませんでした。');
+    lines.push('合計：ギルド '+totalGuilds+' / メンバー '+totalMembers+' / PT '+totalPT+' / PTキャラ '+totalPC);
+    if(status)status.textContent=lines.join('\\n');
+    alert(totalPT||totalPC?'旧データからPTを復帰しました。\\nPT '+totalPT+'件 / PTキャラ '+totalPC+'件':'旧データから復帰できるPTデータは見つかりませんでした。');
+  }catch(e){
+    console.error('legacy recovery error',e);
+    if(status)status.textContent='❌ '+(e?.message||String(e));
+    alert('旧データ復帰に失敗しました。\\n'+(e?.message||String(e)));
+  }
+}
+async function inspectLegacyGuildBattleData(){
+  const status=document.getElementById('legacyRecoveryStatus');
+  if(status)status.textContent='旧DBを確認しています…';
+  try{
+    if(!window.GuildBattleLegacyRecovery?.inspect)throw new Error('旧DB復旧モジュールが読み込まれていません。');
+    const rows=await window.GuildBattleLegacyRecovery.inspect();
+    const lines=rows.map(x=>{
+      if(x.error)return '❌ '+x.name+'：'+x.error;
+      const c=x.counts||{};
+      return '📦 '+x.name+' (v'+(x.version??'?')+')\\n  guilds='+((c.guilds??0))+' members='+((c.members??0))+' parties='+((c.parties??0))+' partyCharacters='+((c.partyCharacters??0))+' characters='+((c.characters??0));
+    });
+    if(status)status.textContent=lines.length?lines.join('\\n\\n'):'旧DBは検出されませんでした。';
+  }catch(e){
+    if(status)status.textContent='❌ '+(e?.message||String(e));
+  }
+}
 window.restoreGuildBattleData=restoreGuildBattleData;window.openMember=openMember;window.openGuild=openGuild;window.addOwnMember=addOwnMember;window.openCharacterForm=openCharacterForm;window.saveParty=saveParty;window.deleteCharacter=deleteCharacter;window.showCharacterDetail=showCharacterDetail;window.renderCharacters=renderCharacters;window.refreshStats=refreshStats;
 function bindPlusButtons(){const ag=$('#addGuild');if(ag)ag.onclick=e=>{e.preventDefault();e.stopPropagation();addGuild().catch(err=>{console.error(err);alert('敵ギルド追加に失敗しました。')})};const nc=$('#newCharacter');if(nc)nc.onclick=e=>{e.preventDefault();e.stopPropagation();openCharacterForm()};const ao=$('#addOwn');if(ao)ao.onclick=e=>{e.preventDefault();e.stopPropagation();addOwnMember().catch(err=>{console.error(err);alert('自軍メンバー追加に失敗しました。')})}}
 window.addEventListener('guildbattle-recovery-complete',async()=>{try{await ensureOwn();await refreshStats();await renderOwn();await renderGuilds();await renderCharacters();}catch(e){console.warn('recovery UI refresh:',e);}});
