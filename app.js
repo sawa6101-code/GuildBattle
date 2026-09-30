@@ -72,19 +72,79 @@ window.deleteMember=deleteMember;window.deleteGuild=deleteGuild;window.cleanupRe
 window.GuildBattleDB={getDB:()=>db,all,get,put,remove,version:DB_VERSION};
 async function init(){await openDB();try{if(window.GuildBattleRecovery?.restoreIfMissing)await window.GuildBattleRecovery.restoreIfMissing();}catch(e){console.warn('pre-init recovery:',e)}await ensureOwn();await refreshStats();await renderOwn();await renderCharacters();setupAppUpdater()}
 /* App update controller */
-const APP_VERSION='2026.09.26-v21';
+const APP_VERSION='2026.09.30-v22';
+function withTimeout(p,ms,label='timeout'){
+  return Promise.race([
+    p,
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error(label)),ms))
+  ]);
+}
 function setupAppUpdater(){
   if(!('serviceWorker' in navigator))return;
   let reloading=false;
   const showStatus=t=>{const e=document.getElementById('appUpdateStatus');if(e)e.textContent=t};
-  const reloadOnce=()=>{if(reloading)return;reloading=true;showStatus('最新版を適用しています…');location.reload()};
+  const reloadOnce=()=>{if(reloading)return;reloading=true;showStatus('最新版を適用しています…');setTimeout(()=>location.reload(),100)};
   navigator.serviceWorker.addEventListener('controllerchange',reloadOnce);
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{
     const check=()=>reg.update().catch(()=>{});
-    check();setInterval(check,30*60*1000);
-    if(reg.waiting){showStatus('新しいバージョンがあります。');}
-    reg.addEventListener('updatefound',()=>{const w=reg.installing;if(!w)return;w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller){showStatus('新しいバージョンを準備しました。');}})});
+    check();
+    setInterval(check,30*60*1000);
+    if(reg.waiting){showStatus('新しいバージョンがあります。')};
+    reg.addEventListener('updatefound',()=>{
+      const w=reg.installing;if(!w)return;
+      w.addEventListener('statechange',()=>{
+        if(w.state==='installed'){
+          if(navigator.serviceWorker.controller){
+            showStatus('新しいバージョンを準備しました。');
+            try{w.postMessage({type:'SKIP_WAITING'})}catch(e){}
+          }else{
+            showStatus('最新版を準備しました。');
+          }
+        }
+      });
+    });
   }).catch(()=>{});
+}
+async function forceAppUpdate(){
+  const status=document.getElementById('appUpdateStatus');
+  if(status)status.textContent='最新版を確認中…';
+  if(!('serviceWorker' in navigator)){
+    if(status)status.textContent='Service Worker非対応のため再読み込みします。';
+    setTimeout(()=>location.reload(),300);
+    return;
+  }
+  try{
+    const reg=await withTimeout(navigator.serviceWorker.getRegistration(),5000,'Service Worker取得タイムアウト');
+    if(!reg){
+      if(status)status.textContent='更新管理を開始します。';
+      await withTimeout(navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}),8000,'Service Worker登録タイムアウト');
+      location.reload();
+      return;
+    }
+    await withTimeout(reg.update(),8000,'最新版確認タイムアウト');
+    if(reg.waiting){
+      if(status)status.textContent='新しいバージョンを適用しています…';
+      reg.waiting.postMessage({type:'SKIP_WAITING'});
+      return;
+    }
+    if(reg.installing){
+      const worker=reg.installing;
+      if(status)status.textContent='新しいバージョンを準備しています…';
+      await withTimeout(new Promise(resolve=>{
+        if(worker.state==='installed')return resolve();
+        worker.addEventListener('statechange',()=>{
+          if(worker.state==='installed'||worker.state==='redundant')resolve();
+        });
+      }),8000,'新バージョン準備タイムアウト');
+      if(worker.state==='installed')worker.postMessage({type:'SKIP_WAITING'});
+      else if(status)status.textContent='更新確認が完了しました。再読み込みしてください。';
+      return;
+    }
+    if(status)status.textContent='現在すでに最新版です。';
+  }catch(e){
+    console.warn('[GuildBattle] app update:',e);
+    if(status)status.textContent='更新確認がタイムアウトしました。ページを再読み込みしてください。';
+  }
 }
 async function restoreGuildBattleData(){
   const status=document.getElementById('recoveryStatus');
