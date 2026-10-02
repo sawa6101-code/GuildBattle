@@ -157,19 +157,6 @@ async function restoreGuildBattleData(){
     alert('自軍・敵軍データの復帰確認が完了しました。');
   }catch(e){console.error('recovery error',e);if(status)status.textContent='復帰に失敗しました。';alert('データ復帰に失敗しました。\\n'+(e?.message||String(e)));}
 }
-async function forceAppUpdate(){
-  if(!('serviceWorker' in navigator))return location.reload();
-  const status=document.getElementById('appUpdateStatus');if(status)status.textContent='最新版を確認中…';
-  try{
-    const reg=await navigator.serviceWorker.getRegistration();
-    if(!reg){location.reload();return;}
-    await reg.update();
-    const worker=reg.waiting||reg.installing;
-    if(reg.waiting){reg.waiting.postMessage({type:'SKIP_WAITING'});return;}
-    if(worker){worker.addEventListener('statechange',()=>{if(worker.state==='installed')worker.postMessage({type:'SKIP_WAITING'})});return;}
-    if(status)status.textContent='現在すでに最新版です。';
-  }catch(e){if(status)status.textContent='更新確認に失敗しました。再読み込みしてください。';}
-}
 async function recoverLegacyGuildBattleData(){
   const status=document.getElementById('legacyRecoveryStatus');
   if(status)status.textContent='旧IndexedDB・隔離バックアップを探索しています…';
