@@ -72,7 +72,8 @@ window.deleteMember=deleteMember;window.deleteGuild=deleteGuild;window.cleanupRe
 window.GuildBattleDB={getDB:()=>db,all,get,put,remove,version:DB_VERSION};
 async function init(){await openDB();try{if(window.GuildBattleRecovery?.restoreIfMissing)await window.GuildBattleRecovery.restoreIfMissing();}catch(e){console.warn('pre-init recovery:',e)}await ensureOwn();await refreshStats();await renderOwn();await renderCharacters();setupAppUpdater()}
 /* App update controller */
-const APP_VERSION='2026.09.30-v22';
+const APP_VERSION='2026.10.03-v23';
+const SW_URL='sw.js?v=20261003-1';
 function withTimeout(p,ms,label='timeout'){
   return Promise.race([
     p,
@@ -85,7 +86,7 @@ function setupAppUpdater(){
   const showStatus=t=>{const e=document.getElementById('appUpdateStatus');if(e)e.textContent=t};
   const reloadOnce=()=>{if(reloading)return;reloading=true;showStatus('最新版を適用しています…');setTimeout(()=>location.reload(),100)};
   navigator.serviceWorker.addEventListener('controllerchange',reloadOnce);
-  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{
+  navigator.serviceWorker.register(SW_URL,{updateViaCache:'none'}).then(reg=>{
     const check=()=>reg.update().catch(()=>{});
     check();
     setInterval(check,30*60*1000);
@@ -117,7 +118,7 @@ async function forceAppUpdate(){
     const reg=await withTimeout(navigator.serviceWorker.getRegistration(),5000,'Service Worker取得タイムアウト');
     if(!reg){
       if(status)status.textContent='更新管理を開始します。';
-      await withTimeout(navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}),8000,'Service Worker登録タイムアウト');
+      await withTimeout(navigator.serviceWorker.register(SW_URL,{updateViaCache:'none'}),8000,'Service Worker登録タイムアウト');
       location.reload();
       return;
     }
