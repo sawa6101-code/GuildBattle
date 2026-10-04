@@ -72,8 +72,8 @@ window.deleteMember=deleteMember;window.deleteGuild=deleteGuild;window.cleanupRe
 window.GuildBattleDB={getDB:()=>db,all,get,put,remove,version:DB_VERSION};
 async function init(){await openDB();try{if(window.GuildBattleRecovery?.restoreIfMissing)await window.GuildBattleRecovery.restoreIfMissing();}catch(e){console.warn('pre-init recovery:',e)}await ensureOwn();await refreshStats();await renderOwn();await renderCharacters();setupAppUpdater()}
 /* App update controller */
-const APP_VERSION='2026.10.03-v23';
-const SW_URL='sw.js?v=20261003-1';
+const APP_VERSION='2026.10.05-v24';
+const SW_URL='sw.js?v=20261005-1';
 function withTimeout(p,ms,label='timeout'){
   return Promise.race([
     p,
@@ -108,43 +108,30 @@ function setupAppUpdater(){
 }
 async function forceAppUpdate(){
   const status=document.getElementById('appUpdateStatus');
-  if(status)status.textContent='最新版を確認中…';
-  if(!('serviceWorker' in navigator)){
-    if(status)status.textContent='Service Worker非対応のため再読み込みします。';
-    setTimeout(()=>location.reload(),300);
-    return;
-  }
+  const setStatus=t=>{if(status)status.textContent=t};
+  setStatus('最新版を確認中…');
   try{
-    const reg=await withTimeout(navigator.serviceWorker.getRegistration(),5000,'Service Worker取得タイムアウト');
-    if(!reg){
-      if(status)status.textContent='更新管理を開始します。';
-      await withTimeout(navigator.serviceWorker.register(SW_URL,{updateViaCache:'none'}),8000,'Service Worker登録タイムアウト');
-      location.reload();
+    if(!('serviceWorker' in navigator)){
+      setStatus('Service Worker非対応のため再読み込みします。');
+      setTimeout(()=>location.reload(),300);
       return;
     }
-    await withTimeout(reg.update(),8000,'最新版確認タイムアウト');
-    if(reg.waiting){
-      if(status)status.textContent='新しいバージョンを適用しています…';
-      reg.waiting.postMessage({type:'SKIP_WAITING'});
-      return;
+    setStatus('旧キャッシュを解除しています…');
+    const regs=await withTimeout(navigator.serviceWorker.getRegistrations(),5000,'Service Worker取得タイムアウト');
+    await Promise.all(regs.map(r=>r.unregister().catch(()=>false)));
+    if('caches' in window){
+      const keys=await withTimeout(caches.keys(),5000,'キャッシュ一覧取得タイムアウト');
+      await Promise.all(keys.map(k=>caches.delete(k).catch(()=>false)));
     }
-    if(reg.installing){
-      const worker=reg.installing;
-      if(status)status.textContent='新しいバージョンを準備しています…';
-      await withTimeout(new Promise(resolve=>{
-        if(worker.state==='installed')return resolve();
-        worker.addEventListener('statechange',()=>{
-          if(worker.state==='installed'||worker.state==='redundant')resolve();
-        });
-      }),8000,'新バージョン準備タイムアウト');
-      if(worker.state==='installed')worker.postMessage({type:'SKIP_WAITING'});
-      else if(status)status.textContent='更新確認が完了しました。再読み込みしてください。';
-      return;
-    }
-    if(status)status.textContent='現在すでに最新版です。';
+    setStatus('最新版を再読み込みしています…');
+    const u=new URL(location.href);
+    u.searchParams.set('guildbattle_refresh',Date.now().toString());
+    u.hash='';
+    location.replace(u.toString());
   }catch(e){
-    console.warn('[GuildBattle] app update:',e);
-    if(status)status.textContent='更新確認がタイムアウトしました。ページを再読み込みしてください。';
+    console.warn('[GuildBattle] hard app update:',e);
+    setStatus('更新処理に失敗しました。通常の再読み込みを実行します。');
+    setTimeout(()=>location.reload(),500);
   }
 }
 async function restoreGuildBattleData(){
