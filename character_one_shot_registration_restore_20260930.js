@@ -1,17 +1,36 @@
-/* Guaranteed one-photo character registration UI v2026-09-30
-   Repairs the button/card even if the older OCR module failed to mount its UI.
-   Uses ParanoiseOCRNewCharacter.analyze/confirmCreate when available.
+/* Guaranteed one-photo character registration UI v2026-10-06
+   Character OCR bootstrap: if the main OCR module is missing, load it explicitly.
 */
 (function(){
 'use strict';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+let modulePromise=null;
+
+async function ensureOCRModule(){
+  if(window.ParanoiseOCRNewCharacter?.analyze) return window.ParanoiseOCRNewCharacter;
+  if(modulePromise) return modulePromise;
+  modulePromise=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='character_ocr_new_registration.js?v=20261006-2';
+    s.async=false;
+    s.onload=()=>{
+      if(window.ParanoiseOCRNewCharacter?.analyze) resolve(window.ParanoiseOCRNewCharacter);
+      else reject(new Error('character_ocr_new_registration.js は読み込まれましたがOCR APIが登録されませんでした。'));
+    };
+    s.onerror=()=>reject(new Error('character_ocr_new_registration.js の読み込みに失敗しました。'));
+    document.head.appendChild(s);
+  }).catch(e=>{modulePromise=null;throw e});
+  return modulePromise;
+}
+
 function ensure(){
  const section=$('#characters'),head=section?.querySelector('.section-head');
  if(!section||!head)return;
  let button=$('#oneShotCharacterRestoreButton');
  if(!button){
-   button=document.createElement('button');button.type='button';button.id='oneShotCharacterRestoreButton';button.className='small primary';button.textContent='📷 1枚から登録';head.appendChild(button);
+   button=document.createElement('button');button.type='button';button.id='oneShotCharacterRestoreButton';
+   button.className='small primary';button.textContent='📷 1枚から登録';head.appendChild(button);
  }
  let box=$('#oneShotCharacterRestoreBox');
  if(!box){
@@ -32,10 +51,11 @@ function ensure(){
    analyze.onclick=async()=>{
     const f=$('#oneShotCharacterFile')?.files?.[0],st=$('#oneShotCharacterStatus'),fields=$('#oneShotCharacterFields');
     if(!f)return alert('キャラクター詳細スクショを選択してください。');
-    if(!window.ParanoiseOCRNewCharacter?.analyze)return st.textContent='OCRモジュールを読み込めません。ページを再読み込みしてください。';
-    analyze.disabled=true;st.textContent='画像全体を解析しています…';fields.innerHTML='';
+    analyze.disabled=true;st.textContent='OCRモジュールを確認しています…';fields.innerHTML='';
     try{
-      const r=await window.ParanoiseOCRNewCharacter.analyze(f);window.__oneShotCharacterRestore=r;
+      const api=await ensureOCRModule();
+      st.textContent='画像全体を解析しています…';
+      const r=await api.analyze(f);window.__oneShotCharacterRestore=r;
       fields.innerHTML='<div class="notice"><b>キャラ名:</b> '+esc(r.name||'未検出')+
        '<br><b>統合名:</b> '+esc((r.name||'')+(r.title?'（'+r.title+'）':''))+
        '<br><b>種別:</b> '+esc(r.title||'未検出')+
@@ -57,20 +77,23 @@ function ensure(){
       st.textContent='解析完了。内容を確認してから登録してください。';
       $('#oneShotCharacterConfirm').onclick=async()=>{
         try{
-          if(!window.ParanoiseOCRNewCharacter?.confirmCreate)throw new Error('登録モジュールを読み込めません');
-          await window.ParanoiseOCRNewCharacter.confirmCreate(r,r.existing_id||null);
+          const currentApi=await ensureOCRModule();
+          if(!currentApi.confirmCreate)throw new Error('登録APIが利用できません');
+          await currentApi.confirmCreate(r,r.existing_id||null);
           st.textContent='登録完了';
           fields.innerHTML='<div class="notice">✅ キャラクターDBへ登録しました。画像参照・スキルOCR・スクショ証拠も保存対象です。</div>';
           window.dispatchEvent(new CustomEvent('character-db-repository-recovered'));
         }catch(e){alert('登録エラー: '+(e.message||e));}
       };
-    }catch(e){st.textContent='解析エラー: '+(e.message||e);console.error(e)}
-    finally{analyze.disabled=false}
+    }catch(e){
+      console.error('Character OCR bootstrap:',e);
+      st.textContent='OCR起動エラー: '+(e.message||e);
+    }finally{analyze.disabled=false}
    };
  }
 }
 document.addEventListener('DOMContentLoaded',ensure);
 setTimeout(ensure,500);setTimeout(ensure,1500);setTimeout(ensure,3000);
 new MutationObserver(ensure).observe(document.body,{childList:true,subtree:true});
-window.GuildBattleOneShotCharacterUI={ensure};
+window.GuildBattleOneShotCharacterUI={ensure,ensureOCRModule};
 })();
