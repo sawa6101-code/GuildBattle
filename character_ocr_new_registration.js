@@ -11,7 +11,31 @@ function put(d,n,x){return new Promise((ok,no)=>{const r=d.transaction(n,'readwr
 function fileData(f){return new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f)})}
 function loadImg(src){return new Promise((ok,no)=>{const im=new Image();im.onload=()=>ok(im);im.onerror=()=>no(new Error('画像を読み込めません'));im.src=src})}
 function cropData(im,x,y,w,h,type='image/jpeg',quality=.9){const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w));c.height=Math.max(1,Math.round(h));c.getContext('2d').drawImage(im,x,y,w,h,0,0,c.width,c.height);return c.toDataURL(type,quality)}
-async function ensureOCR(){if(window.Tesseract)return;const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';document.head.appendChild(s);await new Promise((ok,no)=>{s.onload=ok;s.onerror=no})}
+let __ocrLoadPromise=null;
+async function ensureOCR(){
+ if(window.Tesseract)return;
+ if(__ocrLoadPromise)return __ocrLoadPromise;
+ __ocrLoadPromise=(async()=>{
+  const urls=[
+   'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+   'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js'
+  ];
+  let last;
+  for(const url of urls){
+   try{
+    await new Promise((ok,no)=>{
+     const s=document.createElement('script');s.src=url;s.async=true;
+     s.onload=()=>window.Tesseract?ok():no(new Error('Tesseract global unavailable'));
+     s.onerror=()=>no(new Error('OCR script load failed: '+url));
+     document.head.appendChild(s);
+    });
+    if(window.Tesseract)return;
+   }catch(e){last=e}
+  }
+  throw new Error('OCRモジュールを読み込めません。通信またはCDN接続を確認してください。'+(last?'':''));
+ })();
+ try{await __ocrLoadPromise}catch(e){__ocrLoadPromise=null;throw e}
+}
 async function ocr(src){await ensureOCR();try{const r=await Tesseract.recognize(src,'jpn+eng');return r.data?.text||''}catch{return ''}}
 const lines=t=>String(t).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
 function cleanLine(s){return String(s??'').replace(/^[\s\-・●◆▶•]+/,'').trim()}
