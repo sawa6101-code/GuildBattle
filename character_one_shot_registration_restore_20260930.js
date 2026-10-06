@@ -12,7 +12,7 @@ async function ensureOCRModule(){
   if(modulePromise) return modulePromise;
   modulePromise=new Promise((resolve,reject)=>{
     const s=document.createElement('script');
-    s.src='character_ocr_new_registration.js?v=20261006-3';
+    s.src='character_ocr_new_registration.js?v=20261006-4';
     s.async=false;
     s.onload=()=>{
       if(window.ParanoiseOCRNewCharacter?.analyze) resolve(window.ParanoiseOCRNewCharacter);
