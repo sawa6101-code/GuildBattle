@@ -4,7 +4,7 @@
 */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle', V=7;
+const DB='paranoize-guildbattle', V=7;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const norm=s=>String(s??'').normalize('NFKC').replace(/[\s　]+/g,'').replace(/[・･]/g,'').toLowerCase();
