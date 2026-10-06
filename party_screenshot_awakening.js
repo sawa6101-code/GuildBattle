@@ -132,8 +132,32 @@ function combineCandidates(chars,names,visual,rarity,element){
  }).sort((a,b)=>b.score-a.score||b.image_score-a.image_score||b.name_score-a.name_score);
  return rows;
 }
+let __ocrLoadPromise=null;
+async function ensureOCR(){
+ if(window.Tesseract)return;
+ if(__ocrLoadPromise)return __ocrLoadPromise;
+ __ocrLoadPromise=(async()=>{
+  const urls=[
+   'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+   'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js'
+  ];
+  for(const url of urls){
+   try{
+    await new Promise((res,rej)=>{
+     const s=document.createElement('script');s.src=url;s.async=true;
+     s.onload=()=>window.Tesseract?res():rej(new Error('OCR unavailable'));
+     s.onerror=()=>rej(new Error('OCR script load failed'));
+     document.head.appendChild(s);
+    });
+    if(window.Tesseract)return;
+   }catch(e){}
+  }
+  throw new Error('OCRモジュールを読み込めません');
+ })();
+ try{await __ocrLoadPromise}catch(e){__ocrLoadPromise=null;throw e}
+}
 async function ocrText(data){
- if(!window.Tesseract){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=res;s.onerror=()=>rej(new Error('OCRエンジンの読み込みに失敗しました'));document.head.appendChild(s)})}
+ await ensureOCR();
  return Tesseract.recognize(data,'jpn+eng',{logger:()=>{}}).then(r=>r?.data?.text||'').catch(()=> '');
 }
 function detectStarVisual(data){
@@ -166,7 +190,7 @@ function visualAwakening(data){
  })
 }
 async function ocrFullImage(data){
- if(!window.Tesseract){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=res;s.onerror=()=>rej(new Error('OCRエンジンの読み込みに失敗しました'));document.head.appendChild(s)})}
+ await ensureOCR();
  try{const r=await Tesseract.recognize(data,'jpn+eng',{logger:()=>{}});return {text:r?.data?.text||'',words:r?.data?.words||[]}}catch{return {text:'',words:[]}}
 }
 function slotBoxes(w,h){
