@@ -40,11 +40,33 @@ async function imageFeatures(src){
  })
 }
 function visual(a,b){if(!a||!b||a.length!==b.length)return 0;let e=0;for(let i=0;i<a.length;i++)e+=Math.abs(a[i]-b[i]);return Math.max(0,1-e/(a.length*15))}
+let __ocrLoadPromise=null;
+async function ensureOCR(){
+ if(window.Tesseract)return;
+ if(__ocrLoadPromise)return __ocrLoadPromise;
+ __ocrLoadPromise=(async()=>{
+  const urls=[
+   'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+   'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js'
+  ];
+  let last;
+  for(const url of urls){
+   try{
+    await new Promise((a,b)=>{
+     const s=document.createElement('script');s.src=url;s.async=true;
+     s.onload=()=>window.Tesseract?a():b(new Error('OCR script unavailable'));
+     s.onerror=()=>b(new Error('OCR script load failed'));
+     document.head.appendChild(s);
+    });
+    if(window.Tesseract)return;
+   }catch(e){last=e}
+  }
+  throw new Error('OCRモジュールを読み込めません');
+ })();
+ try{await __ocrLoadPromise}catch(e){__ocrLoadPromise=null;throw e}
+}
 async function ocr(src){
- if(!window.Tesseract){
-  const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-  document.head.appendChild(s);await new Promise((a,b)=>{s.onload=a;s.onerror=b})
- }
+ await ensureOCR();
  const r=await Tesseract.recognize(src,'jpn+eng');return r.data?.text||''
 }
 function extractName(text,chars){
