@@ -1,7 +1,7 @@
 /* Character reference status dashboard */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle',V=4,$=s=>document.querySelector(s);
+const DB='paranoize-guildbattle',V=7,$=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const openDB=()=>new Promise((ok,no)=>{const r=indexedDB.open(DB,V);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
 const all=(d,n)=>new Promise((ok,no)=>{const r=d.transaction(n).objectStore(n).getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
