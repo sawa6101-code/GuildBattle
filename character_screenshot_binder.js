@@ -140,7 +140,7 @@ function candidateRows(chars,refs,name,features,ocrText=''){
 function renderCandidateList(rows,query=''){
  const q=norm(query);
  const filtered=q?rows.filter(x=>norm(x.id).includes(q)||norm(x.name).includes(q)||norm(parts({name:x.name}).base).includes(q)||norm(parts({name:x.name}).title).includes(q)):rows;
- return filtered.slice(0,50).map((x,i)=>'<label style="display:block;margin:.35rem 0"><input type="radio" name="csCandidate" value="'+esc(x.id)+'"> '+(i===0&&!q?'⭐ ':'')+esc(x.id)+' '+esc(x.name)+' / 名前 '+Math.round(x.name_score*100)+'% / 画像 '+Math.round(x.image*100)+'% / 参照'+x.reference_count+'件 / 総合 '+Math.round(x.score*100)+'%</label>').join('')||'<p class="hint">該当候補なし。ID・キャラクター名・種別で検索できます。</p>';
+ return filtered.slice(0,50).map((x,i)=>'<label style="display:block;margin:.35rem 0"><input type="radio" name="csCandidate" value="'+esc(x.id)+'" '+((window.__csPreferredCharacterId&&x.id===window.__csPreferredCharacterId)||(!window.__csPreferredCharacterId&&i===0&&!q)?'checked':'')+'> '+(window.__csPreferredCharacterId&&x.id===window.__csPreferredCharacterId?'📌 登録対象 ':'')+(i===0&&!q?'⭐ ':'')+esc(x.id)+' '+esc(x.name)+' / 名前 '+Math.round(x.name_score*100)+'% / 画像 '+Math.round(x.image*100)+'% / 参照'+x.reference_count+'件 / 総合 '+Math.round(x.score*100)+'%</label>').join('')||'<p class="hint">該当候補なし。ID・キャラクター名・種別で検索できます。</p>';
 }
 async function analyze(){
  const cf=$('#csCharFile')?.files?.[0], sf=[...($('#csSkillFile')?.files||[])];
@@ -148,7 +148,7 @@ async function analyze(){
  const out=$('#csResult'), skillOut=$('#csSkillResult');out.textContent='画像・OCRを解析中…';skillOut.textContent='';
  const d=await openDB(),chars=await all(d,'characters'),refs=await all(d,'characterImages');d.close();
  const blob=await fileData(cf),features=await imageFeatures(blob),text=await ocr(blob),name=extractName(text,chars);
- const rows=candidateRows(chars,refs,name,features,text),top=rows[0],second=rows[1];
+ const rows=candidateRows(chars,refs,name,features,text);const preferred=window.__csPreferredCharacterId;if(preferred){rows.sort((a,b)=>(a.id===preferred?-1:b.id===preferred?1:0));}const top=rows[0],second=rows[1];
  const margin=(top?.score||0)-(second?.score||0);
  const auto=!!top&&((top.exact===1&&margin>=.12)||(top.image>=.90&&top.reference_count>0&&margin>=.06));
  const skillRecords=[];
