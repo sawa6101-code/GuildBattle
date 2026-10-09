@@ -4,7 +4,7 @@
 */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle',VER=7,URL='./data/character-master.json';
+const DB='paranoize-guildbattle',VER=7,URL='./data/character-master.json';
 const norm=s=>String(s??'').normalize('NFKC').replace(/[\s　]+/g,'').replace(/[（(]/g,'(').replace(/[）)]/g,')').toLowerCase();
 const now=()=>new Date().toISOString();
 const open=()=>new Promise((res,rej)=>{const r=indexedDB.open(DB,VER);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
