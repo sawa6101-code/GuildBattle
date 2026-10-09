@@ -4,7 +4,7 @@
 */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle';
+const DB='paranoize-guildbattle';
 const EXTRA=[
  ['橘 智弥（兄として、友として）','SSR'],
  ['宮本 蓮士（打ち明けた秘密）','SSR'],
