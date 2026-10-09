@@ -4,7 +4,7 @@
 */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle';
+const DB='paranoize-guildbattle';
 const R=[
  {name:'火神 禅（戦地を統べる赤き虎）',rarity:'SSR',element:'闇',role:'物理アタッカー',max_mp:6,title:'戦地を統べる赤き虎',skills:['ポイズンスキン','HP倍増EX','孤軍奮闘','サバイバー','ヘビーアタック']},
  {name:'ヨーコ（フライトの前に）',rarity:'SSR',element:'闇',role:'特殊アタッカー',max_mp:6,title:'フライトの前に',skills:['オートポイズン','HP反転(味方)','HP反転EX','ポイズンイーター','アタック']},
