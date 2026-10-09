@@ -1,6 +1,6 @@
 /* Party import: クロろんこたれ蔵 / screenshot 2026-09-18. */
 (function(){
-const DB='paranoise-guildbattle',VER=7,PLAYER='クロろんこたれ蔵';
+const DB='paranoize-guildbattle',VER=7,PLAYER='クロろんこたれ蔵';
 const PARTIES=[
 {no:1,total:75195811,chars:[
 {pos:1,name:'宮本 涼子（潮風とレモンの記憶）',level:186,power:13570000},
