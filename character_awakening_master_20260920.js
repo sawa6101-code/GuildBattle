@@ -4,7 +4,7 @@
 */
 (function(){
 'use strict';
-const DB='paranoise-guildbattle';
+const DB='paranoize-guildbattle';
 const R={
  'ポイズンスキン':[10,20,40,70,100],
  '復讐スリープ(2体)':[10,20,40,70,100],
