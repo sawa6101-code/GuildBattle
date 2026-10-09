@@ -208,5 +208,5 @@ function install(){
  $('#csAnalyze').onclick=()=>analyze().catch(e=>{$('#csResult').textContent='解析エラー: '+e.message});
 }
 window.GuildBattleCharacterScreenshot={analyze,confirmRegistration,parseSkills};
-document.addEventListener('DOMContentLoaded',install);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
