@@ -72,7 +72,7 @@ window.deleteMember=deleteMember;window.deleteGuild=deleteGuild;window.cleanupRe
 window.GuildBattleDB={getDB:()=>db,all,get,put,remove,version:DB_VERSION};
 async function init(){await openDB();try{if(window.GuildBattleRecovery?.restoreIfMissing)await window.GuildBattleRecovery.restoreIfMissing();}catch(e){console.warn('pre-init recovery:',e)}await ensureOwn();await refreshStats();await renderOwn();await renderCharacters();setupAppUpdater()}
 /* App update controller */
-const APP_VERSION='2026.10.09-v30';
+const APP_VERSION='2026.10.09-v31';
 const SW_URL='sw.js?v=20261006-3';
 function withTimeout(p,ms,label='timeout'){
   return Promise.race([
