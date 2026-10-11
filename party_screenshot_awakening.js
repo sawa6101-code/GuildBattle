@@ -69,18 +69,26 @@ async function detectElement(data){
 }
 async function imageCandidates(data,chars,candidateIds){
  const db=await openDB();let imgs=[];try{imgs=await all(db,'characterImages')}catch{}db.close();
- const allowed=candidateIds?new Set(candidateIds):null,q=await imageFeatures(data),out=[];
+ const allowed=candidateIds?new Set(candidateIds):null;
+ // パーティー画面のカード全体ではなく、名前・星・レベル・戦力表示を除いた
+ // イラスト領域を優先して照合する。カード枠や文字の差で類似度が落ちるのを防ぐ。
+ let queryData=data;
+ try{const im=await loadImg(data);queryData=cropData(im,im.width*.035,im.height*.025,im.width*.93,im.height*.69)}catch{}
+ const q=await imageFeatures(queryData),out=[];
  for(const im of imgs){
   if(im.verified===false||!im.character_id||!im.blob||(allowed&&!allowed.has(im.character_id)))continue;
   try{
-   let s=0;
+   const scores=[];
    if(Array.isArray(im.features)&&im.features.length){
     for(const ref of im.features){
      const v=Array.isArray(ref)?ref:ref?.vector;
-     if(v) for(const qv of q)s=Math.max(s,featureSimilarity(qv.vector,v));
+     if(v) for(const qv of q)scores.push(featureSimilarity(qv.vector,v));
     }
    }
-   if(s<=0&&im.blob){const f=await imageFeatures(im.blob);for(const qv of q)for(const fv of f)s=Math.max(s,featureSimilarity(qv.vector,fv.vector))}
+   if(!scores.length&&im.blob){const rf=await imageFeatures(im.blob);for(const qv of q)for(const fv of rf)scores.push(featureSimilarity(qv.vector,fv.vector))}
+   // 単一領域の偶然の色一致ではなく、複数領域の一致も評価する。
+   scores.sort((a,b)=>b-a);
+   const s=scores.length?(scores[0]*.68+(scores[1]||scores[0])*.32):0;
    if(s>0)out.push({id:im.character_id,score:s,reference_id:im.id,reference_name:im.reference_name||'',reference_title:im.reference_title||''});
   }catch{}
  }
