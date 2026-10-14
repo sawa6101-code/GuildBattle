@@ -47,7 +47,8 @@ async function ensureOCR(){
  __ocrLoadPromise=(async()=>{
   const urls=[
    'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
-   'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js'
+   'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js',
+   'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js'
   ];
   let last;
   for(const url of urls){
