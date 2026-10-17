@@ -233,7 +233,8 @@ async function analyze(file,partyId){
   const exactOcr=!!top&&top.name_score>=.98&&margin>=.08;
   const nm=top;
   const awText=parseAwakeningText(text),aw=awText.value!==null?awText:(await visualAwakening(data)),starVisual=aw.value===null?await detectStarVisual(data):aw;
-  const nameConf=nm?.score||0;
+  // 候補順位スコアを認識信頼度として流用しない。OCR確定または強い画像一致のみ信頼度に反映。
+  const nameConf=exactOcr?Math.max(nm?.name_score||0,.98):visualAuto?Math.min(.98,top?.image_score||0):0;
   out.push({
    position:i+1,crop:data,ocr:text,full_ocr:full.text,
    rarity:rarity.value,rarity_confidence:rarity.confidence,rarity_source:rarity.source,
