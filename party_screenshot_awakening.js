@@ -6,7 +6,7 @@
 (function(){
 'use strict';
 const DB='paranoize-guildbattle';
-const VERSION='4.2.0';
+const VERSION='4.2.1';
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const norm=s=>String(s??'').normalize('NFKC').replace(/[\s　]+/g,'').replace(/[・･]/g,'').toLowerCase();
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,7);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
@@ -76,7 +76,7 @@ async function imageCandidates(data,chars,candidateIds){
  try{const im=await loadImg(data);queryData=cropData(im,im.width*.035,im.height*.025,im.width*.93,im.height*.69)}catch{}
  const q=await imageFeatures(queryData),out=[];
  for(const im of imgs){
-  if(im.verified===false||!im.character_id||!im.blob||(allowed&&!allowed.has(im.character_id)))continue;
+  if(im.verified===false||!im.character_id||(!(im.blob)&&!(Array.isArray(im.features)&&im.features.length))||(allowed&&!allowed.has(im.character_id)))continue;
   try{
    const scores=[];
    if(Array.isArray(im.features)&&im.features.length){
