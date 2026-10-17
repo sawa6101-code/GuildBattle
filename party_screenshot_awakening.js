@@ -6,7 +6,7 @@
 (function(){
 'use strict';
 const DB='paranoize-guildbattle';
-const VERSION='4.2.1';
+const VERSION='4.2.2';
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const norm=s=>String(s??'').normalize('NFKC').replace(/[\s　]+/g,'').replace(/[・･]/g,'').toLowerCase();
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,7);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
@@ -251,7 +251,7 @@ async function analyze(file,partyId){
 async function apply(result,manual={}){
  const db=await openDB(),pcs=await all(db,'partyCharacters'),chars=await all(db,'characters');let saved=0;
  for(const s of result.slots){
-  const choice=manual[s.position]||{},cid=choice.character_id||s.character_id;if(!cid)continue;
+  const choice=manual[s.position]||{},cid=Object.prototype.hasOwnProperty.call(choice,'character_id')?choice.character_id:s.character_id;if(!cid)continue;
   let pc=pcs.find(x=>x.party_id===result.party_id&&Number(x.position)===s.position);if(!pc)pc={id:'pc_'+crypto.randomUUID(),party_id:result.party_id,position:s.position};
   const aw=choice.awakening!==undefined?Number(choice.awakening):s.awakening,preservedAwakening=Number.isFinite(pc.awakening)?Number(pc.awakening):0;
   pc.character_id=cid;pc.character_name=chars.find(c=>c.id===cid)?.name||s.character_name||'';
@@ -328,7 +328,7 @@ function renderResult(r){
  const box=$('#psaResults');if(!box)return;
  box.innerHTML='<h4>認識結果</h4>'+r.slots.map(s=>{
   const icon=s.name_confidence>=.9?'🟢':s.name_confidence>=.7?'🟡':'🔴';
-  const opts=(s.candidates||[]).map(c=>'<option value="'+esc(c.id)+'" '+(c.id===s.character_id?'selected':'')+'>'+esc(c.name)+' ['+esc(c.id)+']</option>').join('');
+  const confirmed=s.name_confidence>=.9;const opts=(confirmed?'':'<option value="" selected>未確定（候補を選択してください）</option>')+(s.candidates||[]).map(c=>'<option value="'+esc(c.id)+'" '+(confirmed&&c.id===s.character_id?'selected':'')+'>'+esc(c.name)+' ['+esc(c.id)+']</option>').join('');
   const evidence=(s.match_sources||[]).join('+')||'none';
   return '<div class="card" data-psa-pos="'+s.position+'"><b>'+icon+' 枠'+s.position+'</b><div>候補母集団: '+s.candidate_count+'体 / OCR '+Math.round(s.candidates?.[0]?.name_score*100||0)+'% / 画像 '+Math.round(s.visual_confidence*100)+'% / 差 '+Math.round(s.match_margin*100)+'pt</div><div>レアリティ: '+esc(s.rarity||'未判定')+' '+(s.rarity_match?'✓':'')+' / 属性: '+esc(s.element||'未判定')+' '+(s.element_match?'✓':'')+'</div><div>照合根拠: '+esc(evidence)+(s.image_reference_id?' / 🟢画像参照あり':' / 画像参照なし')+'</div><div>枠OCR: '+esc((s.ocr||'').slice(0,100))+'</div><label>キャラクター<select class="psaChar">'+opts+'</select></label><label>現在の凸<select class="psaAw">'+[0,1,2,3,4].map(n=>'<option value="'+n+'" '+(s.awakening===n?'selected':'')+'>★'+n+'</option>').join('')+'</select></label><small>キャラ信頼度 '+Math.round(s.name_confidence*100)+'% / 凸認識 '+(s.awakening===null?'未認識':Math.round(s.awakening_confidence*100)+'%')+' / '+esc(s.awakening_source)+'</small></div>'
  }).join('')+'<button type="button" class="wide primary" id="psaApply">✅ この6枠をPTへ確定</button>';
