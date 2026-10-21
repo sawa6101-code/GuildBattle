@@ -6,7 +6,7 @@
 (function(){
 'use strict';
 const DB='paranoize-guildbattle';
-const VERSION='4.2.2';
+const VERSION='4.2.3';
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const norm=s=>String(s??'').normalize('NFKC').replace(/[\s　]+/g,'').replace(/[・･]/g,'').toLowerCase();
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,7);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
@@ -73,7 +73,7 @@ async function imageCandidates(data,chars,candidateIds){
  // パーティー画面のカード全体ではなく、名前・星・レベル・戦力表示を除いた
  // イラスト領域を優先して照合する。カード枠や文字の差で類似度が落ちるのを防ぐ。
  let queryData=data;
- try{const im=await loadImg(data);queryData=cropData(im,im.width*.035,im.height*.025,im.width*.93,im.height*.69)}catch{}
+ try{const im=await loadImg(data);queryData=cropData(im,im.width*.08,im.height*.06,im.width*.84,im.height*.64)}catch{}
  const q=await imageFeatures(queryData),out=[];
  for(const im of imgs){
   if(im.verified===false||!im.character_id||(!(im.blob)&&!(Array.isArray(im.features)&&im.features.length))||(allowed&&!allowed.has(im.character_id)))continue;
@@ -204,7 +204,9 @@ async function ocrFullImage(data){
 }
 function slotBoxes(w,h){
  const ratio=w/h;
- if(ratio>=2.2)return Array.from({length:6},(_,i)=>({x:w*i/6,y:0,w:w/6,h:h}));
+ // 横長の6枚編成スクリーンショット：画面全体を6等分せず、カード領域を直接切り出す。
+ // 上部の部隊名/戦力、下部の属性アイコン/戦力値を除外してイラストを優先する。
+ if(ratio>=2.2)return Array.from({length:6},(_,i)=>({x:w*(.058+i*.145),y:h*.265,w:w*.138,h:h*.615}));
  if(ratio>=1.2)return Array.from({length:6},(_,i)=>{const col=i%3,row=Math.floor(i/3);return{x:w*col/3,y:h*row/2,w:w/3,h:h/2}});
  return Array.from({length:6},(_,i)=>{const col=i%2,row=Math.floor(i/2);return{x:w*col/2,y:h*row/3,w:w/2,h:h/3}});
 }
